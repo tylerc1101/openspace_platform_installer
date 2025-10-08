@@ -1,0 +1,99 @@
+---
+- name: Bootstrap mgmt-kvm server
+  hosts: mgmt-kvm
+  become: true
+
+  tasks:
+    - name: Set Hostname
+      hostname:
+        name: "mgmt-kvm.{{ domain_name }}"
+
+    - name: Ensure bridge connections exist and are configured
+      community.general.nmcli:
+        conn_name: "{{ item.con-name }}"
+        ifname: "{{ item.ifname }}"
+        type: "{{ item.type | default('bridge') }}"
+        state: present
+        autoconnect: yes
+        method4: manual
+        ip4: "{{ item.address | default(omit) }}"
+        gw4: "{{ item.gateway | default(omit) }}"
+        dns4: "{{ (item.dns is string) | ternary([item.dns], item.dns | default(omit)) }}"
+        dns4_search: ["{{ dns.domain_name }}"]
+        method6: disabled
+      loop: "{{ interfaces }}"
+
+    - name: Create/attach bridge-slave profiles for member NICs
+      community.general.nmcli:
+        conn_name: "{{ item.0.con-name }}-{{ item.1 }}"
+        ifname: "{{ item.1 }}"
+        type: bridge-slave
+        master: "{{ item.0.con-name }}"
+        autoconnect: yes
+        method4: disabled
+        method6: disabled
+        state: present
+      loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
+
+    - name: Disable interfaces
+      community.general.nmcli:
+        conn_name: "{{ item }}"
+        type: ethernet
+        method4: disabled
+        method6: disabled
+        ipv4_never_default: yes
+        state: present
+      loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
+
+    - name: Bring up member NICs (slaves)
+      community.general.nmcli:
+        conn_name: "{{ item.0.con-name }}-{{ item.1 }}"
+        state: up
+      loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
+
+    - name: Bring up bridges
+      community.general.nmcli:
+        conn_name: "{{ item.con-name }}"
+        state: up
+      loop: "{{ interfaces }}"
+
+    - name: Create repo file
+      copy:
+        source: /data/files/kratos.repo
+        dest: /etc/yum.repos.d/kratos.repo
+        owner: root
+        group: root
+        mode: "0644"
+        
+    - name: Install required packages
+      yum:
+        name:
+          - Development Tools
+          - Virtualization Platform
+          - Container Management
+          - Headless Management
+          - gcc
+          - openssl-devel
+          - bzip2-devel
+          - libffi-devel
+          - zlib-devel
+          - xz-devel
+          - readline-devel
+          - sqlite-devel
+          - wget
+          - virt-install
+          - cockpit-machines
+          - libcdio
+        state: present
+        disable_gpg_check: yes
+
+    - name: Start/Enable services
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+      loop:
+        - libvirtd
+        - cockpit
+
+    

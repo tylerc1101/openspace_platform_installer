@@ -1,29 +1,61 @@
-- id: Copy SSH Key to mgmt_kvm
-  kind: ansible
-  file: "tasks/common/copy_ssh_key.yml"
-  args:
+# Base-Kit Default Profile
+# This profile deploys a management KVM server and creates VMs for OpenSpace infrastructure
+# All configuration comes from usr_home/{env}/group_vars/
+
+metadata:
+  name: "Base-Kit Default"
+  version: "1.0.0"
+  description: "Deploys management KVM server with MCM, OSMS, and OPNsense VMs"
+  profile_kind: basekit
+  
+requirements:
+  # These reference variables from group_vars - validation will check they exist
+  images:
+    - "{onboarder}"
+    - "{basekit}"
+    - "9_5_hardened_image_vm.qcow2"
+  
+  # Inventory must have these host groups
+  inventory_groups:
+    - mgmt_kvm
+    - vms
+  
+  # Environment files that must exist
+  files:
+    - "/install/usr_home/{env}/.ssh/onboarder_ssh_key.pub"
+
+steps:
+  - id: copy_ssh_key
+    description: "Copy SSH Key to mgmt_kvm"
+    kind: ansible
+    file: "tasks/common/copy_ssh_key.yml"
+    args:
       - "-e env_name={env}"
       - "-e target_hosts=mgmt_kvm"
       - "-e ssh_pubkey_path=/install/usr_home/{env}/.ssh/onboarder_ssh_key.pub"
+    on_failure: fail
+    required: true
 
-#- id: Preflight Checks
-#  kind: python3
-#  file: "tasks/basekit/preflight.py"
+  - id: bootstrap_mgmt_kvm
+    description: "Bootstrap Mgmt KVM"
+    kind: ansible
+    file: "tasks/basekit/bootstrap-mgmt-kvm.yml"
+    on_failure: fail
+    required: true
+    timeout: 1800
 
-- id: Bootstrap Mgmt KVM
-  kind: ansible
-  file: "tasks/basekit/bootstrap-mgmt-kvm.yml"
+  - id: deploy_vms
+    description: "Deploy VMs"
+    kind: ansible
+    file: "tasks/basekit/deploy-vms.yml"
+    on_failure: fail
+    required: true
+    timeout: 3600
 
-- id: Deploy VMs
-  kind: ansible
-  file: "tasks/basekit/deploy-vms.yml"
-
-# OPNSense is already configured from the saved config directory.
-# Will need to do this if things change
-#- id: Configure OPNsense
-#  kind: ansible
-#  file: "tasks/basekit-configure-opnsense.yml"
-
-- id: Deploy OPNsense
-  kind: python3
-  file: "tasks/basekit/deploy-opnsense.py"
+  - id: deploy_opnsense
+    description: "Deploy OPNsense"
+    kind: python3
+    file: "tasks/basekit/deploy-opnsense.py"
+    on_failure: fail
+    required: true
+    timeout: 1800

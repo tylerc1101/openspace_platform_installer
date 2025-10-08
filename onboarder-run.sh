@@ -6,105 +6,136 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DATA_DIR="${ROOT_DIR}/data"
 USR_HOME_DIR="${ROOT_DIR}/usr_home"
 
-# -------- constants --------
-KNOWN_PROFILES=("basekit" "baremetal" "aws")
-
 die() { echo "ERROR: $*" >&2; exit 1; }
 usage() {
   cat <<EOF
-Usage: ./onboarder-run.sh --env=<env_name>
+Usage: ./onboarder-run.sh [OPTIONS]
+
+Options:
+  --env=<name>        Environment name (or select interactively)
+  --validate-only     Only validate configuration, don't run
+  --resume            Resume from last successful step
+  --verbose           Enable verbose logging
+  -h, --help          Show this help
 
 Behavior:
-  - Auto-detect runtime
-  - Auto-detect profile from usr_home/<env>/group_vars/<profile>.yml
-  - Read 'onboarder' image tar from that group_vars
-  - Load image from data/images/onboarder/<tar>, run container 'onboarder', remove after
-  - Logs directory: usr_home/<env>/logs
-
-Runs:
-  python3 /install/data/main.py --env <env> --profile <profile>
+  - Auto-detect runtime (podman/docker)
+  - Read profile from usr_home/<env>/.profile
+  - Read onboarder image from group_vars
+  - Run container and execute main.py
 EOF
 }
 
-# -------- pick ENV from usr_home via menu --------
-# Gather non-hidden directories in usr_home
-mapfile -t ENV_DIRS < <(
-  find "${USR_HOME_DIR}" -mindepth 1 -maxdepth 1 -type d \
-    ! -name '.*' \
-    ! -name 'sample_aws' \
-    ! -name 'sample_baremetal' \
-    ! -name 'sample_basekit' \
-    -printf "%f\n" | sort
-)
+# -------- parse options --------
+ENV_NAME=""
+VALIDATE_ONLY=""
+RESUME=""
+VERBOSE=""
 
-[[ ${#ENV_DIRS[@]} -ge 1 ]] || die "No environment directories found in ${USR_HOME_DIR}"
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --env=*)
+      ENV_NAME="${1#*=}"
+      shift
+      ;;
+    --validate-only)
+      VALIDATE_ONLY="--validate-only"
+      shift
+      ;;
+    --resume)
+      RESUME="--resume"
+      shift
+      ;;
+    --verbose|-v)
+      VERBOSE="--verbose"
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "Unknown option: $1"
+      ;;
+  esac
+done
 
-if [[ -t 0 ]]; then
-  echo "Select environment:"
-  select ENV_NAME in "${ENV_DIRS[@]}"; do
-    if [[ -n "${ENV_NAME:-}" ]]; then
-      break
-    else
-      echo "Invalid selection. Try again."
-    fi
-  done
+# -------- pick ENV from usr_home via menu if not specified --------
+if [[ -z "${ENV_NAME}" ]]; then
+  mapfile -t ENV_DIRS < <(
+    find "${USR_HOME_DIR}" -mindepth 1 -maxdepth 1 -type d \
+      ! -name '.*' \
+      ! -name 'sample_aws' \
+      ! -name 'sample_baremetal' \
+      ! -name 'sample_basekit' \
+      -printf "%f\n" | sort
+  )
+
+  [[ ${#ENV_DIRS[@]} -ge 1 ]] || die "No environment directories found in ${USR_HOME_DIR}"
+
+  if [[ -t 0 ]]; then
+    echo "Select environment:"
+    select ENV_NAME in "${ENV_DIRS[@]}"; do
+      if [[ -n "${ENV_NAME:-}" ]]; then
+        break
+      else
+        echo "Invalid selection. Try again."
+      fi
+    done
+  else
+    die "No environment specified. Use --env=<name> or run interactively"
+  fi
 fi
 
 ENV_DIR="${USR_HOME_DIR}/${ENV_NAME}"
 [[ -d "${ENV_DIR}" ]] || die "Environment dir not found: ${ENV_DIR}"
 
+echo "Selected environment: ${ENV_NAME}"
+
+# -------- Read profile from group_vars --------
+# We need to peek into group_vars to find profile_kind
+GROUPVARS_DIR="${ENV_DIR}/group_vars"
+[[ -d "${GROUPVARS_DIR}" ]] || die "Missing group_vars directory in ${ENV_DIR}"
+
+# Try to find which group_vars file exists (basekit.yml, baremetal.yml, aws.yml)
+PROFILE_KIND=""
+for kind in basekit baremetal aws; do
+  if [[ -f "${GROUPVARS_DIR}/${kind}.yml" ]]; then
+    # Verify it has profile_kind set
+    DECLARED_KIND="$(grep -E '^[[:space:]]*profile_kind:' "${GROUPVARS_DIR}/${kind}.yml" | head -1 | awk -F':' '{print $2}' | tr -d " \"'")"
+    if [[ "${DECLARED_KIND}" == "${kind}" ]]; then
+      PROFILE_KIND="${kind}"
+      break
+    fi
+  fi
+done
+
+[[ -n "${PROFILE_KIND}" ]] || die "Could not determine profile kind from ${GROUPVARS_DIR}
+
+Expected one of:
+  - group_vars/basekit.yml with 'profile_kind: basekit'
+  - group_vars/baremetal.yml with 'profile_kind: baremetal'
+  - group_vars/aws.yml with 'profile_kind: aws'"
+
+echo "Profile kind: ${PROFILE_KIND}"
+
+GROUPVARS_FILE="${GROUPVARS_DIR}/${PROFILE_KIND}.yml"
+
 # -------- runtime detection --------
 if command -v podman >/dev/null 2>&1; then
   RUNTIME="podman"
-  SE_OPT_DATA="rw,Z"
-  SE_OPT_ENV="rw,Z"
-  SE_OPT_LOGS="rw,Z"
+  SE_OPT="rw,Z"
 elif command -v docker >/dev/null 2>&1; then
   RUNTIME="docker"
+  SE_OPT="rw"
 else
   die "Neither podman nor docker found in PATH"
 fi
 echo "Using runtime: ${RUNTIME}"
 
-# -------- profile detection (group_vars/<profile>.yml) --------
-GROUPVARS_DIR="${ENV_DIR}/group_vars"
-[[ -d "${GROUPVARS_DIR}" ]] || die "group_vars directory not found: ${GROUPVARS_DIR}"
-
-# gather *.yml files (ignore hidden/backup)
-mapfile -t GROUPVARS_FILES < <(find "${GROUPVARS_DIR}" -maxdepth 1 -type f -name "*.yml" -printf "%f\n" | sort)
-[[ ${#GROUPVARS_FILES[@]} -ge 1 ]] || die "No YAML files found in ${GROUPVARS_DIR} to determine profile kind"
-
-choose_profile_kind() {
-  local candidates=("$@")
-  local filtered=()
-  # prefer known kinds if multiple
-  for f in "${candidates[@]}"; do
-    local name="${f%.yml}"
-    for k in "${KNOWN_PROFILES[@]}"; do
-      if [[ "${name}" == "${k}" ]]; then
-        filtered+=("${name}")
-      fi
-    done
-  done
-  if [[ ${#filtered[@]} -eq 1 ]]; then
-    echo "${filtered[0]}"
-    return 0
-  fi
-  return 1
-}
-
-if ! PROFILE_YAML="$(choose_profile_kind "${GROUPVARS_FILES[@]}")"; then
-  die "Ambiguous profile kind in ${GROUPVARS_DIR}. Found: ${GROUPVARS_FILES[*]}."
-fi
-
-PROFILE="${GROUPVARS_DIR}/${PROFILE_YAML}.yml"
-[[ -f "${PROFILE}" ]] || die "Expected group vars file not found: ${PROFILE}"
-echo "Detected profile kind: ${PROFILE_YAML}"
-
 # -------- resolve onboarder image tar --------
-# Expect in ${PROFILE}: onboarder: "onboarder-<something>.tar[.gz]"
-ONBOARDER_TAR="$(grep -E '^[[:space:]]*onboarder:' "${PROFILE}" | head -1 | awk -F':' '{print $2}' | tr -d " \"'")"
-[[ -n "${ONBOARDER_TAR}" ]] || die "'onboarder' not set in ${PROFILE}"
+ONBOARDER_TAR="$(grep -E '^[[:space:]]*onboarder:' "${GROUPVARS_FILE}" | head -1 | awk -F':' '{print $2}' | tr -d " \"'")"
+[[ -n "${ONBOARDER_TAR}" ]] || die "'onboarder' not set in ${GROUPVARS_FILE}"
 
 IMAGE_ARCHIVE="${DATA_DIR}/images/onboarder/${ONBOARDER_TAR}"
 [[ -f "${IMAGE_ARCHIVE}" ]] || die "Onboarder image archive not found: ${IMAGE_ARCHIVE}"
@@ -112,13 +143,17 @@ IMAGE_ARCHIVE="${DATA_DIR}/images/onboarder/${ONBOARDER_TAR}"
 # -------- load image --------
 echo "Loading image: ${IMAGE_ARCHIVE}"
 
-if [[ -z $(${RUNTIME} images --format '{{.Repository}}:{{.Tag}}') ]]; then
-  ${RUNTIME} load -i "${IMAGE_ARCHIVE}"
-else
-  echo "Image already loaded"
-fi
-
+# Check if image is already loaded
 IMAGE_REF="$(${RUNTIME} images --format '{{.Repository}}:{{.Tag}}' | grep -i 'onboarder' | head -1 || true)"
+
+if [[ -z "${IMAGE_REF}" ]]; then
+  echo "Loading container image..."
+  ${RUNTIME} load -i "${IMAGE_ARCHIVE}"
+  IMAGE_REF="$(${RUNTIME} images --format '{{.Repository}}:{{.Tag}}' | grep -i 'onboarder' | head -1 || true)"
+  [[ -n "${IMAGE_REF}" ]] || die "Failed to load image from ${IMAGE_ARCHIVE}"
+else
+  echo "Image already loaded: ${IMAGE_REF}"
+fi
 
 # -------- container name --------
 CONTAINER_NAME="onboarder"
@@ -135,18 +170,50 @@ mkdir -p "${LOG_DIR}"
 HOST_UID="$(id -u)"
 HOST_GID="$(id -g)"
 
+# Build the command
+CMD_ARGS=(
+  "python3" "/install/data/main.py"
+  "--env" "${ENV_NAME}"
+  "--profile" "${PROFILE_KIND}"
+)
+
+[[ -n "${VALIDATE_ONLY}" ]] && CMD_ARGS+=("${VALIDATE_ONLY}")
+[[ -n "${RESUME}" ]] && CMD_ARGS+=("${RESUME}")
+[[ -n "${VERBOSE}" ]] && CMD_ARGS+=("${VERBOSE}")
+
+echo ""
+echo "========================================"
+echo "Running Onboarder"
+echo "========================================"
+echo "Environment: ${ENV_NAME}"
+echo "Profile: ${PROFILE_KIND}"
+[[ -n "${VALIDATE_ONLY}" ]] && echo "Mode: VALIDATE ONLY"
+[[ -n "${RESUME}" ]] && echo "Resume: Yes"
+[[ -n "${VERBOSE}" ]] && echo "Verbose: Yes"
+echo "Logs: ${LOG_DIR}"
+echo "========================================"
+echo ""
+
 set -x
 ${RUNTIME} run \
   --name "${CONTAINER_NAME}" \
   -u "${HOST_UID}:${HOST_GID}" \
-  -v "${DATA_DIR}:/install/data:${SE_OPT_DATA}" \
-  -v "${ENV_DIR}:/install/usr_home/${ENV_NAME}:${SE_OPT_ENV}" \
-  -v "${LOG_DIR}:/install/logs:${SE_OPT_LOGS}" \
+  -v "${DATA_DIR}:/install/data:${SE_OPT}" \
+  -v "${ENV_DIR}:/install/usr_home/${ENV_NAME}:${SE_OPT}" \
+  -v "${LOG_DIR}:/install/logs:${SE_OPT}" \
   -w /install \
   "${IMAGE_REF}" \
-  python3 /install/data/main.py \
-    --env "${ENV_NAME}" \
-    --profile "${PROFILE_YAML}"
+  "${CMD_ARGS[@]}"
 set +x
 
-echo "Onboarder run complete. Logs: ${LOG_DIR}"
+EXIT_CODE=$?
+
+echo ""
+if [[ ${EXIT_CODE} -eq 0 ]]; then
+  echo "✅ Onboarder completed successfully"
+else
+  echo "❌ Onboarder failed with exit code: ${EXIT_CODE}"
+  echo "Check logs in: ${LOG_DIR}"
+fi
+
+exit ${EXIT_CODE}

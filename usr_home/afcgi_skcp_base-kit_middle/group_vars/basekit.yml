@@ -1,4 +1,25 @@
-profile: "default"
+# group_vars/basekit.yml
+# All configuration for this environment's basekit deployment
+
+# Profile configuration
+profile_kind: "basekit"      # Which profile type: basekit, baremetal, aws
+profile_name: "default"      # Which profile to use: default, minimal, custom, etc.
+
+# Image references (used by profile requirements validation)
 onboarder: "onboarder-full.v3.5.0-rc7.tar.gz"
-osms: "openspace-1.9.0-295.os-app"
 basekit: "openspace-base-kit-1.0.1-config.tar.gz"
+osms: "openspace-1.9.0-295.os-app"
+
+# Optional: Override specific steps behavior
+step_overrides:
+  # You can disable specific steps
+  # deploy_opnsense:
+  #   enabled: false
+  
+  # Or override timeouts
+  # bootstrap_mgmt_kvm:
+  #   timeout: 3600
+  
+  # Or change failure behavior
+  # deploy_vms:
+  #   on_failure: continue

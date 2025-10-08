@@ -42,6 +42,10 @@ def setup_logging(log_dir: Path, verbose: bool = False) -> logging.Logger:
     logger = logging.getLogger("onboarder")
     logger.setLevel(logging.DEBUG if verbose else logging.INFO)
     
+    # Prevent duplicate handlers
+    if logger.handlers:
+        return logger
+    
     # Console handler with colors (if supported)
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
@@ -623,39 +627,6 @@ def main():
         logger.info(f"Log file: {log_file}")
         if timeout:
             logger.info(f"Timeout: {timeout}s")
-        
-        state["steps"][step_id] = {
-            "status": "running",
-            "log": str(log_file),
-            "kind": kind,
-            "file": str(step_file),
-            "description": description
-        }
-        save_state(state)
-
-        # Run the command
-        exit_code = run_command(command, log_file, timeout)
-
-        # Update state based on result
-        if exit_code == 0:
-            logger.info(f"\n✅ [{step_id}] SUCCESS")
-            state["steps"][step_id]["status"] = "ok"
-            state["steps"][step_id]["exit_code"] = 0
-        else:
-            logger.error(f"\n❌ [{step_id}] FAILED (exit code: {exit_code})")
-            logger.error(f"    See log: {log_file}")
-            state["steps"][step_id]["status"] = "failed"
-            state["steps"][step_id]["exit_code"] = exit_code
-            save_state(state)
-            
-            # Handle failure based on on_failure setting
-            if on_failure == "continue":
-                logger.warning(f"    Continuing despite failure (on_failure=continue)")
-            else:
-                logger.error(f"    Stopping execution (on_failure={on_failure})")
-                return EXIT_STEP_FAILED
-
-        save_state(state)
 
     logger.info("\n" + "=" * 60)
     logger.info("✅ All steps completed successfully!")

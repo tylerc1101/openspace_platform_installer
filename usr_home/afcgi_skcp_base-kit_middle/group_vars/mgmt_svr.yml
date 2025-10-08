@@ -3,8 +3,8 @@ interfaces:
     ifname: "br-wan"
     con-name: "br-wan"
     type: "bridge"
-    address: "{{ hostvars['mgmt_kvm'].wan_address }}{{ hostvars['mgmt_kvm'].customer_network.cidr }}"
-    gateway: "{{ gateway.management }}"
+    address: "{{ hostvars['mgmt_kvm'].wan_address }}{{ customer_network.cidr }}"
+    gateway: "{{ customer_network.gateway }}"
     dns: "{{ customer_network.dns_servers }}"
     interfaces:
       - "{{ hostvars['mgmt_kvm'].wan_interface }}"
@@ -13,7 +13,7 @@ interfaces:
     ifname: "br-mgmt"
     con-name: "br-mgmt"
     type: "bridge"
-    address: "{{ hostvars['mgmt_kvm'].mgmt_address }}{{ hostvars['mgmt_kvm'].mgmt_network.cidr }}"
+    address: "{{ hostvars['mgmt_kvm'].mgmt_address }}{{ mgmt_network.cidr }}"
     dns: "{{ mgmt_network.dns_servers }}"
     interfaces:
       - "{{ hostvars['mgmt_kvm'].mgmt_interface }}"
@@ -22,7 +22,7 @@ interfaces:
     ifname: "br-iDRAC"
     con-name: "br-iDRAC"
     type: "bridge"
-    address: "{{ hostvars['mgmt_kvm'].idrac_address }}{{ hostvars['mgmt_kvm'].mgmt_network.cidr }}"
+    address: "{{ hostvars['mgmt_kvm'].idrac_address }}{{ mgmt_network.cidr }}"
     interfaces:
       - "{{ hostvars['mgmt_kvm'].idrac_interface }}"
 

@@ -24,6 +24,7 @@ all:
             mgmt_kvm: 
               ansible_host: 10.243.77.212
               ansible_user: kratos
+              ansible_ssh_pass: "kratos" # plain text for demo only, use vault for production
 
               wan_address: "{{ hostvars['mgmt_kvm'].ansible_host }}"
               wan_interface: "eno12409"

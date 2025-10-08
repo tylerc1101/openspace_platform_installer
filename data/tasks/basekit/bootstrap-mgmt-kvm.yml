@@ -10,7 +10,7 @@
 
     - name: Ensure bridge connections exist and are configured
       community.general.nmcli:
-        conn_name: "{{ item['con-name'] }}"  # ← Changed
+        conn_name: "{{ item['con-name'] }}"
         ifname: "{{ item.ifname }}"
         type: "{{ item.type | default('bridge') }}"
         state: present
@@ -25,35 +25,35 @@
 
     - name: Create/attach bridge-slave profiles for member NICs
       community.general.nmcli:
-        conn_name: "{{ item.0['con-name'] }}-{{ item.1 }}"  # ← Changed
+        conn_name: "{{ item.0['con-name'] }}-{{ item.1 }}"
         ifname: "{{ item.1 }}"
         type: bridge-slave
-        master: "{{ item.0['con-name'] }}"  # ← Changed
+        master: "{{ item.0['con-name'] }}"
         autoconnect: yes
         method4: disabled
         method6: disabled
         state: present
       loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
 
-    - name: Disable interfaces
+    - name: Disable physical interfaces
       community.general.nmcli:
         conn_name: "{{ item.1 }}"
         type: ethernet
         method4: disabled
         method6: disabled
-        ipv4_never_default: yes
+        never_default4: yes
         state: present
       loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
 
     - name: Bring up member NICs (slaves)
       community.general.nmcli:
-        conn_name: "{{ item.0['con-name'] }}-{{ item.1 }}"  # ← Changed
+        conn_name: "{{ item.0['con-name'] }}-{{ item.1 }}"
         state: up
       loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
 
     - name: Bring up bridges
       community.general.nmcli:
-        conn_name: "{{ item['con-name'] }}"  # ← Changed
+        conn_name: "{{ item['con-name'] }}"
         state: up
       loop: "{{ interfaces }}"
 

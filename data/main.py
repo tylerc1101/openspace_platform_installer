@@ -46,12 +46,11 @@ def setup_logging(log_dir: Path, verbose: bool = False) -> logging.Logger:
     if logger.handlers:
         return logger
     
-    # Console handler with colors (if supported)
+    # Console handler - simple format without logger name
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
     console_format = logging.Formatter(
-        '%(asctime)s [%(levelname)s] %(message)s',
-        datefmt='%H:%M:%S'
+        '%(message)s'  # Just the message, no timestamp or level for cleaner output
     )
     console_handler.setFormatter(console_format)
     
@@ -59,13 +58,16 @@ def setup_logging(log_dir: Path, verbose: bool = False) -> logging.Logger:
     file_handler = logging.FileHandler(log_dir / "onboarder.log")
     file_handler.setLevel(logging.DEBUG)
     file_format = logging.Formatter(
-        '%(asctime)s [%(levelname)s] %(name)s - %(message)s',
+        '%(asctime)s [%(levelname)s] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     file_handler.setFormatter(file_format)
     
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
+    
+    # Prevent propagation to root logger
+    logger.propagate = False
     
     return logger
 
@@ -620,13 +622,13 @@ def main():
         log_file = LOG_DIR / f"{step_id}-{safe_desc}.log"
 
         # Update state to "running"
-        logger.info(f"\n{'=' * 60}")
-        logger.info(f"[{step_id}] {description}")
-        logger.info(f"{'=' * 60}")
-        logger.info(f"Step {index} of {len(steps)}")
-        logger.info(f"Log file: {log_file}")
+        print()  # Blank line for separation
+        logger.info("=" * 70)
+        logger.info(f"STEP {index}/{len(steps)}: {description}")
+        logger.info("=" * 70)
         if timeout:
             logger.info(f"Timeout: {timeout}s")
+        logger.info("")  # Blank line before output
         
         logger.debug(f"About to save state and run command for step {step_id}")
         
@@ -648,28 +650,32 @@ def main():
 
         # Update state based on result
         if exit_code == 0:
-            logger.info(f"\n✅ [{step_id}] SUCCESS")
+            print()  # Blank line
+            logger.info("✅ SUCCESS")
+            logger.info("")
             state["steps"][step_id]["status"] = "ok"
             state["steps"][step_id]["exit_code"] = 0
         else:
-            logger.error(f"\n❌ [{step_id}] FAILED (exit code: {exit_code})")
-            logger.error(f"    See log: {log_file}")
+            print()  # Blank line
+            logger.error("❌ FAILED")
+            logger.error(f"Exit code: {exit_code}")
+            logger.error(f"Log: {log_file}")
+            logger.error("")
             state["steps"][step_id]["status"] = "failed"
             state["steps"][step_id]["exit_code"] = exit_code
             save_state(state)
             
             # Handle failure based on on_failure setting
             if on_failure == "continue":
-                logger.warning(f"    Continuing despite failure (on_failure=continue)")
+                logger.warning("⚠️  Continuing despite failure")
             else:
-                logger.error(f"    Stopping execution (on_failure={on_failure})")
                 return EXIT_STEP_FAILED
 
         save_state(state)
 
-    logger.info("\n" + "=" * 60)
-    logger.info("✅ All steps completed successfully!")
-    logger.info("=" * 60)
+    logger.info("\n" + "=" * 70)
+    logger.info("✅ ALL STEPS COMPLETED SUCCESSFULLY!")
+    logger.info("=" * 70)
     return EXIT_SUCCESS
 
 

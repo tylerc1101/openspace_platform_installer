@@ -26,9 +26,9 @@ interfaces:
     interfaces:
       - "{{ hostvars['mgmt_kvm'].idrac_interface }}"
 
-  - name: "prov"
-    ifname: "br-prov"
-    con-name: "br-prov"
-    type: "bridge"
-    interfaces:
-      - "{{ hostvars['mgmt_kvm'].prov_interface }}"
+  #- name: "prov"
+  #  ifname: "br-prov"
+  #  con-name: "br-prov"
+  #  type: "bridge"
+  #  interfaces:
+  #    - "{{ hostvars['mgmt_kvm'].prov_interface }}"

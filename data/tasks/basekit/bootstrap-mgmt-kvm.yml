@@ -19,7 +19,7 @@
         ip4: "{{ item.address | default(omit) }}"
         gw4: "{{ item.gateway | default(omit) }}"
         dns4: "{{ (item.dns is string) | ternary([item.dns], item.dns | default(omit)) }}"
-        dns4_search: ["{{ dns.domain_name }}"]
+        dns4_search: ["{{ domain_name }}"]
         method6: disabled
       loop: "{{ interfaces }}"
 
@@ -37,7 +37,7 @@
 
     - name: Disable interfaces
       community.general.nmcli:
-        conn_name: "{{ item }}"
+        conn_name: "{{ item.1 }}"
         type: ethernet
         method4: disabled
         method6: disabled
@@ -59,7 +59,7 @@
 
     - name: Create repo file
       copy:
-        src: /data/files/kratos.repo
+        src: /install/data/files/kratos.repo
         dest: /etc/yum.repos.d/kratos.repo
         owner: root
         group: root

@@ -9,6 +9,7 @@ Each step can be an Ansible playbook, Python script, or shell script.
 import argparse
 import json
 import logging
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -148,6 +149,12 @@ def run_command(command: List[str], log_file: Path, timeout: Optional[int] = Non
     
     logging.info(f"Running: {' '.join(command)}")
     
+    # Set up environment for ansible
+    env = os.environ.copy()
+    env["ANSIBLE_CONFIG"] = str(DATA_DIR / "ansible.cfg")
+    env["ANSIBLE_HOST_KEY_CHECKING"] = "False"
+    env["ANSIBLE_SSH_RETRIES"] = "3"
+    
     try:
         with open(log_file, 'w') as log:
             process = subprocess.Popen(
@@ -155,7 +162,8 @@ def run_command(command: List[str], log_file: Path, timeout: Optional[int] = Non
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                cwd=str(BASE_DIR)
+                cwd=str(BASE_DIR),
+                env=env
             )
             
             # Print and log output line by line

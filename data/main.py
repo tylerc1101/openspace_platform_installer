@@ -20,6 +20,7 @@ import yaml
 BASE_DIR = Path("/install")
 DATA_DIR = BASE_DIR / "data"
 ENV_DIR = BASE_DIR / "usr_home"
+IMAGES_DIR = BASE_DIR / "images"
 LOG_DIR = BASE_DIR / "logs"
 STATE_FILE = LOG_DIR / "state.json"
 
@@ -204,20 +205,6 @@ def validate_environment(env_path: Path, profile_kind: str, logger: logging.Logg
     
     errors = []
     
-    # Check for .profile file
-    profile_file = env_path / ".profile"
-    if not profile_file.exists():
-        errors.append(f"Missing .profile file: {profile_file}")
-    else:
-        with open(profile_file) as f:
-            declared_profile = f.read().strip()
-            if declared_profile != profile_kind:
-                errors.append(
-                    f".profile declares '{declared_profile}' but using '{profile_kind}'"
-                )
-            else:
-                logger.info(f"✓ Profile file matches: {profile_kind}")
-    
     # Check for config.yml
     inventory_file = env_path / "config.yml"
     if not inventory_file.exists():
@@ -243,6 +230,27 @@ def validate_environment(env_path: Path, profile_kind: str, logger: logging.Logg
             errors.append(f"Missing group vars for profile: {profile_vars}")
         else:
             logger.info(f"✓ Profile group vars exist: {profile_vars}")
+            
+            # Validate it has required keys
+            try:
+                gv = load_yaml_file(profile_vars)
+                if "profile_kind" not in gv:
+                    errors.append(f"Missing 'profile_kind' in {profile_vars}")
+                elif gv["profile_kind"] != profile_kind:
+                    errors.append(
+                        f"profile_kind mismatch: group_vars says '{gv['profile_kind']}' "
+                        f"but using '{profile_kind}'"
+                    )
+                else:
+                    logger.info(f"✓ profile_kind matches: {profile_kind}")
+                
+                if "profile_name" not in gv:
+                    errors.append(f"Missing 'profile_name' in {profile_vars}")
+                else:
+                    logger.info(f"✓ profile_name: {gv['profile_name']}")
+                    
+            except Exception as e:
+                errors.append(f"Failed to validate group_vars: {e}")
     
     # Check for SSH directory
     ssh_dir = env_path / ".ssh"
@@ -268,9 +276,10 @@ def validate_environment(env_path: Path, profile_kind: str, logger: logging.Logg
 
 
 def validate_profile(profile_file: Path, profile_data: Dict[str, Any], 
-                     logger: logging.Logger) -> bool:
+                     group_vars: Dict[str, Any], logger: logging.Logger) -> bool:
     """
     Validate that the profile file is properly structured and all referenced files exist.
+    Substitutes variables from group_vars during validation.
     Returns True if valid, False otherwise.
     """
     logger.info("=" * 60)
@@ -307,9 +316,15 @@ def validate_profile(profile_file: Path, profile_data: Dict[str, Any],
     if requirements:
         logger.info("\nChecking requirements...")
         
-        # Check required images
+        # Check required images (substitute variables)
         req_images = requirements.get("images", [])
-        for image in req_images:
+        for image_template in req_images:
+            # Substitute variables like {onboarder}
+            image = image_template
+            for key, value in group_vars.items():
+                if isinstance(value, str):
+                    image = image.replace(f"{{{key}}}", value)
+            
             image_path = DATA_DIR / "images" / image
             if not image_path.exists():
                 errors.append(f"Required image not found: {image_path}")
@@ -405,14 +420,34 @@ def main():
         logger.error(f"Group vars file not found: {group_vars_file}")
         return EXIT_CONFIG_ERROR
 
-    # Load the profile name from group_vars
+    # Load the profile name and kind from group_vars
     try:
         group_vars = load_yaml_file(group_vars_file)
     except Exception as e:
         logger.error(f"Failed to load group vars: {e}")
         return EXIT_CONFIG_ERROR
     
-    profile_name = group_vars.get("profile", "default")
+    # Get profile_kind and profile_name from group_vars
+    if "profile_kind" not in group_vars:
+        logger.error(f"Missing 'profile_kind' in {group_vars_file}")
+        logger.error("Add: profile_kind: basekit  # or baremetal, aws")
+        return EXIT_CONFIG_ERROR
+    
+    if "profile_name" not in group_vars:
+        logger.error(f"Missing 'profile_name' in {group_vars_file}")
+        logger.error("Add: profile_name: default  # or custom, minimal, etc.")
+        return EXIT_CONFIG_ERROR
+    
+    gv_profile_kind = group_vars["profile_kind"]
+    profile_name = group_vars["profile_name"]
+    
+    # Verify it matches what we're trying to use
+    if gv_profile_kind != profile_kind:
+        logger.error(
+            f"Profile kind mismatch: group_vars declares '{gv_profile_kind}' "
+            f"but script is using '{profile_kind}'"
+        )
+        return EXIT_CONFIG_ERROR
     
     # Find the profile file
     profile_file = DATA_DIR / "profiles" / profile_kind / f"{profile_name}.yml"
@@ -430,7 +465,7 @@ def main():
         return EXIT_CONFIG_ERROR
     
     # Validate profile structure
-    if not validate_profile(profile_file, profile_data, logger):
+    if not validate_profile(profile_file, profile_data, group_vars, logger):
         return EXIT_VALIDATION_FAILED
     
     # If validate-only mode, stop here
@@ -497,9 +532,9 @@ def main():
             save_state(state)
             return EXIT_FILE_NOT_FOUND
 
-        # Replace placeholders in arguments
+        # Replace placeholders in arguments (including group_vars variables)
         rendered_args = [
-            replace_placeholders(arg, env_name, profile_name, profile_kind)
+            replace_placeholders(arg, env_name, profile_name, profile_kind, group_vars)
             for arg in step_args
         ]
 

@@ -9,12 +9,6 @@ metadata:
   profile_kind: basekit
   
 requirements:
-  # These reference variables from group_vars - validation will check they exist
-  images:
-    - "{onboarder}"
-    - "{basekit}"
-    - "9_5_hardened_image_vm.qcow2"
-  
   # Inventory must have these host groups
   inventory_groups:
     - mgmt_kvm

@@ -10,7 +10,7 @@
 
     - name: Ensure bridge connections exist and are configured
       community.general.nmcli:
-        conn_name: "{{ item.con-name }}"
+        conn_name: "{{ item['con-name'] }}"  # ← Changed
         ifname: "{{ item.ifname }}"
         type: "{{ item.type | default('bridge') }}"
         state: present
@@ -25,10 +25,10 @@
 
     - name: Create/attach bridge-slave profiles for member NICs
       community.general.nmcli:
-        conn_name: "{{ item.0.con-name }}-{{ item.1 }}"
+        conn_name: "{{ item.0['con-name'] }}-{{ item.1 }}"  # ← Changed
         ifname: "{{ item.1 }}"
         type: bridge-slave
-        master: "{{ item.0.con-name }}"
+        master: "{{ item.0['con-name'] }}"  # ← Changed
         autoconnect: yes
         method4: disabled
         method6: disabled
@@ -47,19 +47,19 @@
 
     - name: Bring up member NICs (slaves)
       community.general.nmcli:
-        conn_name: "{{ item.0.con-name }}-{{ item.1 }}"
+        conn_name: "{{ item.0['con-name'] }}-{{ item.1 }}"  # ← Changed
         state: up
       loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
 
     - name: Bring up bridges
       community.general.nmcli:
-        conn_name: "{{ item.con-name }}"
+        conn_name: "{{ item['con-name'] }}"  # ← Changed
         state: up
       loop: "{{ interfaces }}"
 
     - name: Create repo file
       copy:
-        source: /data/files/kratos.repo
+        src: /data/files/kratos.repo
         dest: /etc/yum.repos.d/kratos.repo
         owner: root
         group: root
@@ -68,10 +68,10 @@
     - name: Install required packages
       yum:
         name:
-          - Development Tools
-          - Virtualization Platform
-          - Container Management
-          - Headless Management
+          - "@Development Tools"
+          - "@Virtualization Platform"
+          - "@Container Management"
+          - "@Headless Management"
           - gcc
           - openssl-devel
           - bzip2-devel
@@ -95,5 +95,3 @@
       loop:
         - libvirtd
         - cockpit
-
-    

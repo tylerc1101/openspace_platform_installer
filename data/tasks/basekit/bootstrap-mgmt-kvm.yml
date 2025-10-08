@@ -52,17 +52,35 @@
         state: present
       loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
 
-    - name: Bring up member NICs (slaves)
-      community.general.nmcli:
-        conn_name: "{{ item.0['con-name'] }}-{{ item.1 }}"
-        state: up
+    - name: Check if member NICs (slaves) are already active
+      ansible.builtin.command:
+        cmd: "nmcli -g GENERAL.STATE connection show {{ item.0['con-name'] }}-{{ item.1 }}"
       loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
+      register: slave_states
+      changed_when: false
+      failed_when: false
 
-    - name: Bring up bridges
-      community.general.nmcli:
-        conn_name: "{{ item['con-name'] }}"
-        state: up
+    - name: Bring up member NICs (slaves) if not already active
+      ansible.builtin.command:
+        cmd: "nmcli connection up {{ item.item.0['con-name'] }}-{{ item.item.1 }}"
+      loop: "{{ slave_states.results }}"
+      when: item.rc == 0 and 'activated' not in item.stdout
+      changed_when: true
+
+    - name: Check if bridges are already active
+      ansible.builtin.command:
+        cmd: "nmcli -g GENERAL.STATE connection show {{ item['con-name'] }}"
       loop: "{{ interfaces }}"
+      register: bridge_states
+      changed_when: false
+      failed_when: false
+
+    - name: Bring up bridges if not already active
+      ansible.builtin.command:
+        cmd: "nmcli connection up {{ item.item['con-name'] }}"
+      loop: "{{ bridge_states.results }}"
+      when: item.rc == 0 and 'activated' not in item.stdout
+      changed_when: true
 
     - name: Create repo file
       copy:

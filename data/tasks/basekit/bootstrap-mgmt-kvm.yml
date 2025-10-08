@@ -35,13 +35,20 @@
         state: present
       loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
 
-    - name: Disable physical interfaces
+    - name: Remove existing physical interface connections
       community.general.nmcli:
         conn_name: "{{ item.1 }}"
+        state: absent
+      loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
+      ignore_errors: yes
+
+    - name: Create disabled physical interface connections
+      community.general.nmcli:
+        conn_name: "{{ item.1 }}"
+        ifname: "{{ item.1 }}"
         type: ethernet
         method4: disabled
         method6: disabled
-        never_default4: yes
         state: present
       loop: "{{ interfaces | subelements('interfaces', skip_missing=True) }}"
 

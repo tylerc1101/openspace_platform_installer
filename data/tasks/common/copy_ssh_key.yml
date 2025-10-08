@@ -1,7 +1,8 @@
 ---
 - name: Bootstrap SSH key to one or more target hosts
   hosts: "{{ target_hosts }}"
-  gather_facts: no  # CRITICAL: Don't gather facts before we have SSH access
+  gather_facts: no
+  become: no  # IMPORTANT: We don't need sudo to copy SSH keys to our own user
   
   vars:
     env_name: "{{ env_name | mandatory }}"
@@ -9,12 +10,6 @@
     ssh_pubkey_path: "{{ ssh_pubkey_path | mandatory }}"
 
   tasks:
-    - name: Wait for SSH connection with password
-      ansible.builtin.wait_for_connection:
-        timeout: 10
-      vars:
-        ansible_ssh_common_args: ""  # Override any SSH args that might interfere
-
     - name: Validate that ssh_pubkey_path exists (on localhost)
       ansible.builtin.stat:
         path: "{{ ssh_pubkey_path }}"
@@ -35,8 +30,10 @@
       register: pubkey_content
 
     - name: Ensure ~/.ssh directory exists on target
-      ansible.builtin.raw: "mkdir -p ~/.ssh && chmod 700 ~/.ssh"
-      changed_when: false
+      ansible.builtin.file:
+        path: "~/.ssh"
+        state: directory
+        mode: '0700'
 
     - name: Add public key to authorized_keys
       ansible.builtin.authorized_key:

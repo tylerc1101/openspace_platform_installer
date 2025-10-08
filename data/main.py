@@ -175,6 +175,52 @@ def run_command(command: List[str], log_file: Path, timeout: Optional[int] = Non
         return 1
 
 
+def install_rpms(logger: logging.Logger) -> bool:
+    """
+    Install any RPMs found in /install/images/rpms/.
+    Returns True if successful or no RPMs found, False on failure.
+    """
+    rpms_dir = IMAGES_DIR / "rpms"
+    
+    if not rpms_dir.exists():
+        logger.info("No rpms directory found, skipping RPM installation")
+        return True
+    
+    # Find all .rpm files
+    rpm_files = list(rpms_dir.glob("*.rpm"))
+    
+    if not rpm_files:
+        logger.info("No RPM files found in rpms directory")
+        return True
+    
+    logger.info("=" * 60)
+    logger.info("Installing RPMs from images/rpms/")
+    logger.info("=" * 60)
+    logger.info(f"Found {len(rpm_files)} RPM(s) to install:")
+    
+    for rpm in rpm_files:
+        logger.info(f"  - {rpm.name}")
+    
+    # Install all RPMs at once
+    rpm_paths = [str(rpm) for rpm in rpm_files]
+    command = ["rpm", "-ivh", "--force"] + rpm_paths
+    
+    log_file = LOG_DIR / "00-install-rpms.log"
+    
+    logger.info(f"Installing RPMs... (log: {log_file})")
+    exit_code = run_command(command, log_file)
+    
+    if exit_code == 0:
+        logger.info("✅ RPMs installed successfully")
+        logger.info("=" * 60 + "\n")
+        return True
+    else:
+        logger.error(f"❌ RPM installation failed (exit code: {exit_code})")
+        logger.error(f"See log: {log_file}")
+        logger.info("=" * 60 + "\n")
+        return False
+
+
 def build_command(step: Dict[str, Any], step_file: Path, 
                  inventory_file: Path, rendered_args: List[str]) -> List[str]:
     """Build the command to run based on step type."""
@@ -325,7 +371,7 @@ def validate_profile(profile_file: Path, profile_data: Dict[str, Any],
                 if isinstance(value, str):
                     image = image.replace(f"{{{key}}}", value)
             
-            image_path = DATA_DIR / "images" / image
+            image_path = IMAGES_DIR / image
             if not image_path.exists():
                 errors.append(f"Required image not found: {image_path}")
             else:
@@ -472,6 +518,11 @@ def main():
     if cli_args.validate_only:
         logger.info("\n✅ Validation complete. Exiting (--validate-only mode)")
         return EXIT_SUCCESS
+    
+    # Install RPMs before running steps
+    if not install_rpms(logger):
+        logger.error("Failed to install required RPMs")
+        return EXIT_CONFIG_ERROR
     
     # Extract steps from profile
     steps = profile_data.get("steps", [])

@@ -1,5 +1,5 @@
 - name: Configure OPNsense VM
-  hosts: mgmt-kvm
+  hosts: mgmt_kvm
   become: yes
   tasks:
     - name: Deploy config.env

@@ -1,5 +1,5 @@
 - name: Deploy power scripts
-  hosts: mgmt-kvm
+  hosts: mgmt_kvm
   become: yes
   tasks:
     - name: Create scripts directory

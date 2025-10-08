@@ -1,6 +1,6 @@
 ---
 - name: Stage OpenSpace base-kit assets on mgmt-kvm
-  hosts: mgmt-kvm
+  hosts: mgmt_kvm
   become: yes
   tasks:
     

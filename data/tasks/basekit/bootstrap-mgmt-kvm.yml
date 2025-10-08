@@ -1,6 +1,6 @@
 ---
 - name: Bootstrap mgmt-kvm server
-  hosts: mgmt-kvm
+  hosts: mgmt_kvm
   become: true
 
   tasks:

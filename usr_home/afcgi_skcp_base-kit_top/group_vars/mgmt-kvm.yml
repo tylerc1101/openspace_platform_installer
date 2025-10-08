@@ -3,32 +3,32 @@ interfaces:
     ifname: "br-wan"
     con-name: "br-wan"
     type: "bridge"
-    address: "{{ hostvars['mgmt-kvm'].wan_address }}{{ hostvars['mgmt-kvm'].customer_network.cidr }}"
+    address: "{{ hostvars['mgmt_kvm'].wan_address }}{{ hostvars['mgmt_kvm'].customer_network.cidr }}"
     gateway: "{{ gateway.management }}"
     dns: "{{ customer_network.dns_servers }}"
     interfaces:
-      - "{{ hostvars['mgmt-kvm'].wan_interface }}"
+      - "{{ hostvars['mgmt_kvm'].wan_interface }}"
 
   - name: "mgmt"
     ifname: "br-mgmt"
     con-name: "br-mgmt"
     type: "bridge"
-    address: "{{ hostvars['mgmt-kvm'].mgmt_address }}{{ hostvars['mgmt-kvm'].mgmt_network.cidr }}"
+    address: "{{ hostvars['mgmt_kvm'].mgmt_address }}{{ hostvars['mgmt_kvm'].mgmt_network.cidr }}"
     dns: "{{ mgmt_network.dns_servers }}"
     interfaces:
-      - "{{ hostvars['mgmt-kvm'].mgmt_interface }}"
+      - "{{ hostvars['mgmt_kvm'].mgmt_interface }}"
 
   - name: "iDRAC"
     ifname: "br-iDRAC"
     con-name: "br-iDRAC"
     type: "bridge"
-    address: "{{ hostvars['mgmt-kvm'].idrac_address }}{{ hostvars['mgmt-kvm'].mgmt_network.cidr }}"
+    address: "{{ hostvars['mgmt_kvm'].idrac_address }}{{ hostvars['mgmt_kvm'].mgmt_network.cidr }}"
     interfaces:
-      - "{{ hostvars['mgmt-kvm'].idrac_interface }}"
+      - "{{ hostvars['mgmt_kvm'].idrac_interface }}"
 
   - name: "prov"
     ifname: "br-prov"
     con-name: "br-prov"
     type: "bridge"
     interfaces:
-      - "{{ hostvars['mgmt-kvm'].prov_interface }}"
+      - "{{ hostvars['mgmt_kvm'].prov_interface }}"

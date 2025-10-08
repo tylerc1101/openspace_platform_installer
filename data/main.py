@@ -154,6 +154,9 @@ def run_command(command: List[str], log_file: Path, timeout: Optional[int] = Non
     env["ANSIBLE_CONFIG"] = str(DATA_DIR / "ansible.cfg")
     env["ANSIBLE_HOST_KEY_CHECKING"] = "False"
     env["ANSIBLE_SSH_RETRIES"] = "3"
+    # Force unbuffered output for real-time streaming
+    env["PYTHONUNBUFFERED"] = "1"
+    env["ANSIBLE_FORCE_COLOR"] = "true"
     
     try:
         with open(log_file, 'w') as log:
@@ -162,14 +165,16 @@ def run_command(command: List[str], log_file: Path, timeout: Optional[int] = Non
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
+                bufsize=1,  # Line buffered
                 cwd=str(BASE_DIR),
                 env=env
             )
             
-            # Print and log output line by line
+            # Print and log output line by line with immediate flush
             for line in process.stdout:
-                print(line, end='')
+                print(line, end='', flush=True)  # Force flush immediately
                 log.write(line)
+                log.flush()  # Flush log file too
             
             exit_code = process.wait(timeout=timeout)
             return exit_code

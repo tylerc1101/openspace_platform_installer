@@ -18,11 +18,19 @@
         msg: "Variable 'basekit' is not defined in group_vars"
       when: basekit is not defined
 
+    - name: Check if libvirt config directory is empty
+      ansible.builtin.find:
+        paths: /var/lib/libvirt/config
+        file_type: any
+        hidden: yes
+      register: config_dir_contents
+
     - name: Copy base-kit config files
       ansible.builtin.copy:
         src: "/install/images/{{ basekit }}/config/"
         dest: "/var/lib/libvirt/config"
         remote_src: no
+      when: config_dir_contents.matched == 0
 
     - name: Set correct permissions on all images in images directory
       ansible.builtin.file:

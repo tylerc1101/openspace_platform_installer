@@ -123,6 +123,7 @@
         state: running
         autostart: yes
       when: not mcm_exists
+      register: mcm_start
 
     # ---------- OSMS ----------
     - name: Check if OSMS VM already exists
@@ -188,6 +189,7 @@
         state: running
         autostart: yes
       when: not osms_exists
+      register: osms_start
 
     # ---------- OSDC provisioner ----------
     - name: Check if OSDC provisioner VM already exists
@@ -217,3 +219,8 @@
       when: 
         - not osdc_exists
       register: osdc_result
+
+    - name: Wait for initial boot and all reboots to complete
+      ansible.builtin.pause:
+        minutes: 5  # Adjust based on how long the reboots take
+      when: mcm_start | osms_start is changed

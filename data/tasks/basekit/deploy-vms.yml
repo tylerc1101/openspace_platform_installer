@@ -6,18 +6,42 @@
     images_dir: /var/lib/libvirt/config/images
 
   tasks:
+    # Pre-flight checks
+    - name: Ensure libvirt config directory exists
+      ansible.builtin.file:
+        path: /var/lib/libvirt/config
+        state: directory
+        mode: '0755'
+
+    - name: Check if base-kit archive variable is defined
+      ansible.builtin.fail:
+        msg: "Variable 'basekit' is not defined in group_vars"
+      when: basekit is not defined
+
     - name: Extract base-kit archive
       ansible.builtin.unarchive:
-        src: "/data/images/{{ basekit }}"
+        src: "/install/images/{{ basekit }}"
         dest: "/var/lib/libvirt/config"
+        remote_src: no
         extra_opts: ["--no-overwrite-dir"]
+
+    - name: Check if hardened image exists
+      ansible.builtin.stat:
+        path: "{{ images_dir }}/9_5_hardened_image_vm.qcow2"
+      register: hardened_image_stat
+      failed_when: not hardened_image_stat.stat.exists
+
+    - name: Get list of existing VMs
+      community.libvirt.virt:
+        command: list_vms
+      register: existing_vms
 
     # ---------- MCM ----------
     - name: Create VM - MCM (module-based, import from hardened base)
       community.libvirt.virt_install:
         name: mcm
-        memory: 16384
-        vcpus: 8
+        memory: "{{ vm_mcm_memory | default(16384) }}"
+        vcpus: "{{ vm_mcm_vcpus | default(8) }}"
         cpu:
           mode: host-passthrough
         disks:
@@ -39,14 +63,15 @@
           type: vnc
         boot: uefi
         state: running
+      when: "'mcm' not in existing_vms.list_vms"
       register: mcm_result
 
     # ---------- OSMS ----------
     - name: Create VM - OSMS (module-based, import from hardened base)
       community.libvirt.virt_install:
         name: osms
-        memory: 32768
-        vcpus: 16
+        memory: "{{ vm_osms_memory | default(32768) }}"
+        vcpus: "{{ vm_osms_vcpus | default(16) }}"
         cpu:
           mode: host-passthrough
         disks:
@@ -65,28 +90,28 @@
           type: vnc
         boot: uefi
         state: running
+      when: "'osms' not in existing_vms.list_vms"
       register: osms_result
 
     # ---------- OSDC provisioner ----------
+    - name: Check if Rocky ISO exists
+      ansible.builtin.stat:
+        path: "{{ images_dir }}/Rocky-9.4-x86_64-dvd.iso"
+      register: rocky_iso_stat
+
     - name: Create VM - OSDC provisioner
       community.libvirt.virt_install:
         name: osdc-provisioner
-        memory: 6144
-        vcpus: 4
+        memory: "{{ vm_osdc_memory | default(6144) }}"
+        vcpus: "{{ vm_osdc_vcpus | default(4) }}"
         cpu:
           mode: host-passthrough
         disks:
           - size: 100
             format: qcow2
         cdrom: "{{ images_dir }}/Rocky-9.4-x86_64-dvd.iso"
-        boot_opts:
-          uefi: true
-          kernel: "{{ images_dir }}/Rocky-9.4-x86_64-dvd.iso/isolinux/vmlinuz"
-          initrd: "{{ images_dir }}/Rocky-9.4-x86_64-dvd.iso/isolinux/initrd.img"
-          kernel_args: inst.ks=file:/prov_vm_ks.cfg console=tty0
-        inject_files:
-          - src: "/var/lib/libvirt/config/vm_config/osdc/prov_vm_ks.cfg"
-            dest: "/prov_vm_ks.cfg"
+        # NOTE: boot_opts with kernel/initrd from ISO may not work
+        # Consider using direct ISO boot or PXE instead
         os_variant: rocky9
         networks:
           - bridge: br-iDRAC
@@ -95,4 +120,14 @@
         autostart: false
         noautoconsole: true
         state: defined
+      when: 
+        - "'osdc-provisioner' not in existing_vms.list_vms"
+        - rocky_iso_stat.stat.exists
       register: osdc_result
+
+    - name: Summary of created VMs
+      ansible.builtin.debug:
+        msg:
+          - "MCM: {{ 'created' if mcm_result is changed else 'already exists' }}"
+          - "OSMS: {{ 'created' if osms_result is changed else 'already exists' }}"
+          - "OSDC: {{ 'created' if osdc_result is changed else 'already exists or ISO missing' }}"

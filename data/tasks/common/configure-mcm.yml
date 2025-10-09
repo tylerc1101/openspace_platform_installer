@@ -1,0 +1,10 @@
+- name: Configure MCM
+  hosts: mcm
+  become: true
+
+  tasks:
+    - name: Set Hostname
+      hostname:
+        name: "mcm.{{ domain_name }}"
+
+    

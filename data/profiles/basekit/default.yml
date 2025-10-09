@@ -46,6 +46,22 @@ steps:
     required: true
     timeout: 3600
 
+  - id: configure_mcm
+    description: "Configure MCM"
+    kind: ansible
+    file: "tasks/common/configure-mcm.yml"
+    on_failure: fail
+    required: true
+    timeout: 1800
+
+  - id: configure_osms
+    description: "Configure OSMS"
+    kind: ansible
+    file: "tasks/common/configure-osms.yml"
+    on_failure: fail
+    required: true
+    timeout: 1800
+
   - id: deploy_opnsense
     description: "Deploy OPNsense"
     kind: python3

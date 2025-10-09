@@ -119,7 +119,7 @@
         chmod 0644 /etc/sysconfig/network-scripts/ifcfg-enp1s0
      
         # SSH key setup
-        mkdir -p /home/kratos/.ssh
+        mkdir-p /home/kratos/.ssh
         chmod 0700 /home/kratos/.ssh
         upload /install/usr_home/afcgi_skcp_base-kit_middle/.ssh/mcm_ssh_key.pub /home/kratos/.ssh/authorized_keys
         chmod 0600 /home/kratos/.ssh/authorized_keys
@@ -127,6 +127,7 @@
         # Ensure SSH is enabled
         sh "systemctl enable sshd"
         EOF
+      when: not mcm_exists
 
     - name: Start MCM VM
       community.libvirt.virt:
@@ -187,7 +188,7 @@
           DNS1=192.168.2.1
       when: not osms_exists
 
-    - name: Configure MCM disk with network and SSH settings
+    - name: Configure OSMS disk with network and SSH settings
       ansible.builtin.shell: |
         export LIBGUESTFS_BACKEND=direct
         guestfish -a {{ osms_disk.stdout }} -i <<EOF
@@ -196,7 +197,7 @@
         chmod 0644 /etc/sysconfig/network-scripts/ifcfg-enp1s0
      
         # SSH key setup
-        mkdir -p /home/kratos/.ssh
+        mkdir-p /home/kratos/.ssh
         chmod 0700 /home/kratos/.ssh
         upload /install/usr_home/afcgi_skcp_base-kit_middle/.ssh/osms_ssh_key.pub /home/kratos/.ssh/authorized_keys
         chmod 0600 /home/kratos/.ssh/authorized_keys

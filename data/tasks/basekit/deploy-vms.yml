@@ -97,7 +97,7 @@
 
     - name: Create network config for MCM enp1s0
       ansible.builtin.copy:
-        dest: /tmp/mcm-ifcfg-enp1s0
+        dest: /tmp/ifcfg-enp1s0
         content: |
           TYPE=Ethernet
           BOOTPROTO=static
@@ -110,24 +110,17 @@
           DNS1=192.168.2.1
       when: not mcm_exists
 
-    - name: Configure MCM disk with network and SSH settings
-      ansible.builtin.shell: |
-        export LIBGUESTFS_BACKEND=direct
-        guestfish -a {{ mcm_disk.stdout }} -i <<EOF
-        # Network configuration
-        upload /tmp/mcm-ifcfg-enp1s0 /etc/sysconfig/network-scripts/ifcfg-enp1s0
-        chmod 0644 /etc/sysconfig/network-scripts/ifcfg-enp1s0
-     
-        # SSH key setup
-        mkdir-p /home/kratos/.ssh
-        chmod 0700 /home/kratos/.ssh
-        upload /install/usr_home/afcgi_skcp_base-kit_middle/.ssh/rancher_ssh_key.pub /home/kratos/.ssh/authorized_keys
-        chmod 0600 /home/kratos/.ssh/authorized_keys
-    
-        # Ensure SSH is enabled
-        sh "systemctl enable sshd"
-        EOF
+    - name: Inject network config into MCM disk
+      ansible.builtin.command:
+        cmd: virt-copy-in -a {{ mcm_disk.stdout }} /tmp/ifcfg-enp1s0 /etc/sysconfig/network-scripts/
+      environment:
+        LIBGUESTFS_BACKEND: direct
       when: not mcm_exists
+
+    - name: Remove temporary network config file for MCM
+      ansible.builtin.file:
+        path: /tmp/ifcfg-enp1s0
+        state: absent
 
     - name: Start MCM VM
       community.libvirt.virt:
@@ -175,7 +168,7 @@
 
     - name: Create network config for OSMS enp1s0
       ansible.builtin.copy:
-        dest: /tmp/osms-ifcfg-enp1s0
+        dest: /tmp/ifcfg-enp1s0
         content: |
           TYPE=Ethernet
           BOOTPROTO=static
@@ -188,24 +181,17 @@
           DNS1=192.168.2.1
       when: not osms_exists
 
-    - name: Configure OSMS disk with network and SSH settings
-      ansible.builtin.shell: |
-        export LIBGUESTFS_BACKEND=direct
-        guestfish -a {{ osms_disk.stdout }} -i <<EOF
-        # Network configuration
-        upload /tmp/osms-ifcfg-enp1s0 /etc/sysconfig/network-scripts/ifcfg-enp1s0
-        chmod 0644 /etc/sysconfig/network-scripts/ifcfg-enp1s0
-     
-        # SSH key setup
-        mkdir-p /home/kratos/.ssh
-        chmod 0700 /home/kratos/.ssh
-        upload /install/usr_home/afcgi_skcp_base-kit_middle/.ssh/osms_ssh_key.pub /home/kratos/.ssh/authorized_keys
-        chmod 0600 /home/kratos/.ssh/authorized_keys
-    
-        # Ensure SSH is enabled
-        sh "systemctl enable sshd"
-        EOF
+    - name: Inject network config into OSMS disk
+      ansible.builtin.command:
+        cmd: virt-copy-in -a {{ osms_disk.stdout }} /tmp/ifcfg-enp1s0 /etc/sysconfig/network-scripts/
+      environment:
+        LIBGUESTFS_BACKEND: direct
       when: not osms_exists
+
+    - name: Remove temporary network config file for OSMS
+      ansible.builtin.file:
+        path: /tmp/ifcfg-enp1s0
+        state: absent
 
     - name: Start OSMS VM
       community.libvirt.virt:

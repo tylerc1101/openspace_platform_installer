@@ -67,7 +67,6 @@
           --disk size=600,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
-          --network bridge=br-prov,model=virtio
           --import
           --autostart
           --noautoconsole

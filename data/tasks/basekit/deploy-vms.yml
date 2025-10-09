@@ -20,7 +20,7 @@
 
     - name: Copy base-kit config files
       ansible.builtin.copy:
-        src: "/install/images/{{ basekit }}/config"
+        src: "/install/images/{{ basekit }}/config/"
         dest: "/var/lib/libvirt/config"
         remote_src: no
 

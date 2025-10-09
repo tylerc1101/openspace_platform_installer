@@ -101,7 +101,7 @@
         content: |
           TYPE=Ethernet
           BOOTPROTO=static
-          NAME=enp1s0
+          NAME=static-enp1s0
           DEVICE=enp1s0
           ONBOOT=yes
           IPADDR=192.168.2.8
@@ -112,10 +112,15 @@
 
     - name: Inject network config into MCM disk
       ansible.builtin.command:
-        cmd: virt-copy-in -a {{ mcm_disk.stdout }} /tmp/mcm-ifcfg-enp1s0 /etc/sysconfig/network-scripts/
+        cmd: virt-copy-in -a {{ mcm_disk.stdout }} /tmp/ifcfg-enp1s0 /etc/sysconfig/network-scripts/
       environment:
         LIBGUESTFS_BACKEND: direct
       when: not mcm_exists
+
+    - name: Remove temporary network config file for MCM
+      ansible.builtin.file:
+        path: /tmp/ifcfg-enp1s0
+        state: absent
 
     - name: Start MCM VM
       community.libvirt.virt:
@@ -167,7 +172,7 @@
         content: |
           TYPE=Ethernet
           BOOTPROTO=static
-          NAME=enp1s0
+          NAME=static-enp1s0
           DEVICE=enp1s0
           ONBOOT=yes
           IPADDR=192.168.2.9
@@ -178,10 +183,15 @@
 
     - name: Inject network config into OSMS disk
       ansible.builtin.command:
-        cmd: virt-copy-in -a {{ osms_disk.stdout }} /tmp/osms-ifcfg-enp1s0 /etc/sysconfig/network-scripts/
+        cmd: virt-copy-in -a {{ osms_disk.stdout }} /tmp/ifcfg-enp1s0 /etc/sysconfig/network-scripts/
       environment:
         LIBGUESTFS_BACKEND: direct
       when: not osms_exists
+
+    - name: Remove temporary network config file for OSMS
+      ansible.builtin.file:
+        path: /tmp/ifcfg-enp1s0
+        state: absent
 
     - name: Start OSMS VM
       community.libvirt.virt:

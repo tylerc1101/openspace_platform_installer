@@ -222,5 +222,5 @@
 
     - name: Wait for initial boot and all reboots to complete
       ansible.builtin.pause:
-        minutes: 5  # Adjust based on how long the reboots take
+        minutes: 2  # Adjust based on how long the reboots take
       when: mcm_start is changed or osms_start is changed

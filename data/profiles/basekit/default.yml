@@ -49,7 +49,10 @@ steps:
   - id: configure_mcm
     description: "Configure MCM"
     kind: ansible
-    file: "tasks/common/configure-mcm.yml"
+    file: "tasks/common/configure-node.yml"
+    args:
+      - "-e env_name={env}"
+      - "-e target_hosts=mcm"
     on_failure: fail
     required: true
     timeout: 1800
@@ -57,7 +60,10 @@ steps:
   - id: configure_osms
     description: "Configure OSMS"
     kind: ansible
-    file: "tasks/common/configure-osms.yml"
+    file: "tasks/common/configure-node.yml"
+    args:
+      - "-e env_name={env}"
+      - "-e target_hosts=osms"
     on_failure: fail
     required: true
     timeout: 1800

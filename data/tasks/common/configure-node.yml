@@ -1,0 +1,131 @@
+- name: Configure "{{ target_hosts }}"
+  hosts: "{{ target_hosts }}"
+  become: true
+
+  tasks:
+    - name: Set Hostname
+      hostname:
+        name: "{{ inventory_hostname }}.{{ domain_name }}"
+
+    - name: Configure chrony
+      copy:
+        dest: /etc/chrony.conf
+        content: |
+          server 192.168.2.1 iburst
+          driftfile /var/lib/chrony/drift
+          makestep 1.0 3
+          rtcsync
+          logdir /var/log/chrony
+        mode: '0644'
+
+    - name: Configure sysctl settings for substrate
+      copy:
+        dest: /etc/sysctl.d/50-substrate.conf
+        content: |
+          fs.inotify.max_user_instances=12288
+          fs.inotify.max_user_watches=524288
+        mode: '0644'
+
+    - name: Ensure /etc/rancher/rke2/config.yaml.d directory exists
+      file:
+        path: /etc/rancher/rke2/config.yaml.d
+        state: directory
+        mode: '0755'
+      when: "{{ target_hosts }} in ['osms']"
+
+    - name: Create 60-rancher.yaml
+      copy:
+        dest: /etc/rancher/rke2/config.yaml.d/60-rancher.yaml
+        content: |
+          {
+          "system-default-registry": ""
+          }
+        mode: '0644'
+      when: "{{ target_hosts }} in ['osms']"
+
+    - name: Ensure /etc/systemd/system/rke2-server.service.d exists
+      file:
+        path: /etc/systemd/system/rke2-server.service.d
+        state: directory
+        mode: '0755'
+      when: "{{ target_hosts }} in ['osms']"
+
+    - name: Create override.conf for rke2-server
+      copy:
+        dest: /etc/systemd/system/rke2-server.service.d/override.conf
+        content: |
+          [Service]
+          LimitNOFILE=infinity
+        mode: '0644'
+      when: "{{ target_hosts }} in ['osms']"
+
+    - name: Ensure /etc/systemd/system/rke2-agent.service.d exists
+      file:
+        path: /etc/systemd/system/rke2-agent.service.d
+        state: directory
+        mode: '0755'
+      when: "{{ target_hosts }} in ['osms']"
+
+    - name: Create override.conf for rke2-agent
+      copy:
+        dest: /etc/systemd/system/rke2-agent.service.d/override.conf
+        content: |
+          [Service]
+          LimitNOFILE=infinity
+        mode: '0644'
+      when: "{{ target_hosts }} in ['osms']"
+
+    - name: Create rke2-canal.conf
+      copy:
+        dest: /etc/NetworkManager/conf.d/rke2-canal.conf
+        content: |
+          [keyfile]
+          unmanaged-devices=interface-name:cali*;interface-name:flannel*
+      when: "{{ target_hosts }} in ['osms']"
+
+    - name: Configure kernel modules for KubeVirt
+      copy:
+        dest: /etc/modules-load.d/kube-virt.conf
+        content: |
+          ip_vs
+          ip_vs_rr
+        mode: '0644'
+
+    - name: Enable and start iscsid service (Longhorn requirement)
+      systemd:
+        name: iscsid
+        enabled: yes
+        state: started
+
+    - name: Disable and stop firewalld
+      systemd:
+        name: firewalld
+        enabled: no
+        state: stopped
+
+    - name: Enable and start chronyd
+      systemd:
+        name: chronyd
+        enabled: yes
+        state: started
+
+    - name: Load ip_vs kernel module
+      modprobe:
+        name: ip_vs
+        state: present
+
+    - name: Load ip_vs_rr kernel module
+      modprobe:
+        name: ip_vs_rr
+        state: present
+
+    - name: Apply sysctl settings
+      command: sysctl --system
+      changed_when: false
+
+    - name: Create sudoers entry for openspace user
+      copy:
+        dest: /etc/sudoers.d/{{ ansible_user }}
+        content: "{{ ansible_user }} ALL=(ALL) NOPASSWD:ALL\n"
+        mode: '0440'
+        validate: 'visudo -cf %s'

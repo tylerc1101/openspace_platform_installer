@@ -4,7 +4,6 @@
   become: yes
   vars:
     images_dir: /var/lib/libvirt/config/images
-    cloud_init_dir: /var/lib/libvirt/config/cloud-init
 
   tasks:
     # Pre-flight checks
@@ -66,17 +65,54 @@
           --vcpus {{ vm_mcm_vcpus | default(8) }}
           --cpu host-passthrough
           --disk size=600,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
-          --cloud-init user-data="{{ cloud_init_dir }}/mcm/user-data",meta-data="{{ cloud_init_dir }}/mcm/meta-data",network-config="{{ cloud_init_dir }}/mcm/network-config"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
-          --extra-args "ip={{ hostvars[mcm].ansible_host }}::{{ mgmt_network.gateway }}:255.255.255.0::{{ hostvars[mcm].mgmt_interface }}:none"
           --import
-          --autostart
           --noautoconsole
           --graphics vnc
           --boot uefi
+          --print-xml
+      register: mcm_xml
       when: not mcm_exists
-      register: mcm_result
+
+    - name: Define MCM VM
+      community.libvirt.virt:
+        command: define
+        xml: "{{ mcm_xml.stdout }}"
+      when: not mcm_exists
+
+    - name: Get MCM disk path
+      ansible.builtin.shell: virsh domblklist mcm | grep vda | awk '{print $2}'
+      register: mcm_disk
+      changed_when: false
+      when: not mcm_exists
+
+    - name: Create network config for MCM enp1s0
+      ansible.builtin.copy:
+        dest: /tmp/mcm-ifcfg-enp1s0
+        content: |
+          TYPE=Ethernet
+          BOOTPROTO=static
+          NAME=enp1s0
+          DEVICE=enp1s0
+          ONBOOT=yes
+          IPADDR=192.168.2.8
+          PREFIX=24
+          GATEWAY=192.168.2.1
+          DNS1=192.168.2.1
+      when: not mcm_exists
+
+    - name: Inject network config into MCM disk
+      ansible.builtin.command:
+        cmd: virt-copy-in -a {{ mcm_disk.stdout }} /tmp/mcm-ifcfg-enp1s0 /etc/sysconfig/network-scripts/
+      when: not mcm_exists
+
+    - name: Start MCM VM
+      community.libvirt.virt:
+        name: mcm
+        state: running
+        autostart: yes
+      when: not mcm_exists
 
     # ---------- OSMS ----------
     - name: Check if OSMS VM already exists
@@ -92,17 +128,54 @@
           --vcpus {{ vm_osms_vcpus | default(16) }}
           --cpu host-passthrough
           --disk size=600,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
-          --cloud-init user-data="{{ cloud_init_dir }}/osms/user-data",meta-data="{{ cloud_init_dir }}/osms/meta-data",network-config="{{ cloud_init_dir }}/osms/network-config"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
-          --extra-args "ip={{ hostvars[osms].ansible_host }}::{{ mgmt_network.gateway }}:255.255.255.0::{{ hostvars[osms].mgmt_interface }}:none"
           --import
-          --autostart
           --noautoconsole
           --graphics vnc
           --boot uefi
+          --print-xml > /tmp/osms.xml
       when: not osms_exists
       register: osms_result
+
+    - name: Define OSMS VM
+      community.libvirt.virt:
+        command: define
+        xml: "{{ osms_xml.stdout }}"
+      when: not osms_exists
+
+    - name: Get OSMS disk path
+      ansible.builtin.shell: virsh domblklist osms | grep vda | awk '{print $2}'
+      register: osms_disk
+      changed_when: false
+      when: not osms_exists
+
+    - name: Create network config for OSMS enp1s0
+      ansible.builtin.copy:
+        dest: /tmp/osms-ifcfg-enp1s0
+        content: |
+          TYPE=Ethernet
+          BOOTPROTO=static
+          NAME=enp1s0
+          DEVICE=enp1s0
+          ONBOOT=yes
+          IPADDR=192.168.2.9
+          PREFIX=24
+          GATEWAY=192.168.2.1
+          DNS1=192.168.2.1
+      when: not osms_exists
+
+    - name: Inject network config into OSMS disk
+      ansible.builtin.command:
+        cmd: virt-copy-in -a {{ osms_disk.stdout }} /tmp/osms-ifcfg-enp1s0 /etc/sysconfig/network-scripts/
+      when: not osms_exists
+
+    - name: Start OSMS VM
+      community.libvirt.virt:
+        name: osms
+        state: running
+        autostart: yes
+      when: not osms_exists
 
     # ---------- OSDC provisioner ----------
     - name: Check if OSDC provisioner VM already exists

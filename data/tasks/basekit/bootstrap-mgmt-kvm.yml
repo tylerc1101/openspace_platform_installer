@@ -109,6 +109,7 @@
           - virt-install
           - cockpit-machines
           - libcdio
+          - libguestfs
         state: present
         disable_gpg_check: yes
 

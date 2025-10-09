@@ -135,8 +135,8 @@
           --graphics vnc
           --boot uefi
           --print-xml > /tmp/osms.xml
+      register: osms_xml
       when: not osms_exists
-      register: osms_result
 
     - name: Define OSMS VM
       community.libvirt.virt:

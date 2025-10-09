@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python3
 """
 OpenSpace Onboarder Runner
@@ -92,20 +93,33 @@ def select_environment_interactive() -> str:
     envs = get_available_environments()
     
     if not envs:
-        die(f"No environment directories found in {USR_HOME_DIR}")
+        print_warning("No environments found")
+        response = input("\nCreate a new environment? (y/n): ").strip().lower()
+        if response == 'y':
+            import create_environment
+            sys.exit(create_environment.main())
+        else:
+            die(f"No environment directories found in {USR_HOME_DIR}")
     
     print("Select environment:")
     for idx, env in enumerate(envs, 1):
         print(f"  {idx}) {env}")
+    print(f"  {len(envs) + 1}) + Create new environment")
     
     while True:
         try:
-            choice = input("Selection [1-{}]: ".format(len(envs)))
+            choice = input(f"Selection [1-{len(envs) + 1}]: ")
             idx = int(choice) - 1
+            
+            if idx == len(envs):
+                # Create new environment
+                import create_environment
+                sys.exit(create_environment.main())
+            
             if 0 <= idx < len(envs):
                 return envs[idx]
             else:
-                print_error(f"Invalid selection. Choose 1-{len(envs)}")
+                print_error(f"Invalid selection. Choose 1-{len(envs) + 1}")
         except (ValueError, KeyboardInterrupt):
             print()
             die("Selection cancelled")

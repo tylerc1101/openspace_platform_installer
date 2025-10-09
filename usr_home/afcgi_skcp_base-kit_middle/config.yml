@@ -43,9 +43,15 @@ all:
             mcm: 
               ansible_host: 192.168.2.8
               mgmt_interface: "enp1s0"
+              ansible_user: "kratos"
+              ansible_ssh_pass: "kratos"
+              ansible_become_pass: "kratos"
             osms: 
               ansible_host: 192.168.2.9
               mgmt_interface: "enp1s0"
+              ansible_user: "kratos"
+              ansible_ssh_pass: "kratos"
+              ansible_become_pass: "kratos"
             opensense:
               wan_ip: "10.243.77.222"
                 

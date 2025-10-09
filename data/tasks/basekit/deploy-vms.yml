@@ -24,6 +24,22 @@
         dest: "/var/lib/libvirt/config"
         remote_src: no
 
+    - name: Set correct permissions on all images in images directory
+      ansible.builtin.file:
+        path: "{{ images_dir }}"
+        owner: qemu
+        group: qemu
+        mode: '0644'
+        recurse: yes
+
+    - name: Set correct permissions on images directory
+      ansible.builtin.file:
+        path: "{{ images_dir }}"
+        owner: qemu
+        group: qemu
+        mode: '0755'
+        recurse: no
+
     - name: Check if hardened image exists
       ansible.builtin.stat:
         path: "{{ images_dir }}/9_5_hardened_image_vm.qcow2"

@@ -69,6 +69,7 @@
           --cloud-init user-data="{{ cloud_init_dir }}/mcm/user-data",meta-data="{{ cloud_init_dir }}/mcm/meta-data",network-config="{{ cloud_init_dir }}/mcm/network-config"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
+          --extra-args "ip={{ hostvars[mcm].ansible_host }}::{{ mgmt_network.gateway }}:255.255.255.0::{{ hostvars[mcm].mgmt_interface }}:none"
           --import
           --autostart
           --noautoconsole
@@ -94,6 +95,7 @@
           --cloud-init user-data="{{ cloud_init_dir }}/osms/user-data",meta-data="{{ cloud_init_dir }}/osms/meta-data",network-config="{{ cloud_init_dir }}/osms/network-config"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
+          --extra-args "ip={{ hostvars[osms].ansible_host }}::{{ mgmt_network.gateway }}:255.255.255.0::{{ hostvars[osms].mgmt_interface }}:none"
           --import
           --autostart
           --noautoconsole

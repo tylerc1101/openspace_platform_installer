@@ -42,8 +42,10 @@ all:
           hosts:
             mcm: 
               ansible_host: 192.168.2.8
+              mgmt_interface: "enp1s0"
             osms: 
               ansible_host: 192.168.2.9
+              mgmt_interface: "enp1s0"
             opensense:
               wan_ip: "10.243.77.222"
                 

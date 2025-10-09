@@ -4,6 +4,7 @@
   become: yes
   vars:
     images_dir: /var/lib/libvirt/config/images
+    cloud_init_dir: /var/lib/libvirt/config/cloud-init
 
   tasks:
     # Pre-flight checks
@@ -65,6 +66,7 @@
           --vcpus {{ vm_mcm_vcpus | default(8) }}
           --cpu host-passthrough
           --disk size=600,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
+          --cloud-init user-data="{{ cloud_init_dir }}/mcm/user-data",meta-data="{{ cloud_init_dir }}/mcm/meta-data",network-config="{{ cloud_init_dir }}/mcm/network-config"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
           --import
@@ -89,6 +91,7 @@
           --vcpus {{ vm_osms_vcpus | default(16) }}
           --cpu host-passthrough
           --disk size=600,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
+          --cloud-init user-data="{{ cloud_init_dir }}/osms/user-data",meta-data="{{ cloud_init_dir }}/osms/meta-data",network-config="{{ cloud_init_dir }}/osms/network-config"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
           --import

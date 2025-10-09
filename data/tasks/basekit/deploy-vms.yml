@@ -214,15 +214,6 @@
           --os-variant=rocky9
           --network bridge=br-iDRAC,model=virtio
           --noautoconsole
-          --noautostart
       when: 
         - not osdc_exists
-        - rocky_iso_stat.stat.exists
       register: osdc_result
-
-    - name: Summary of VM operations
-      ansible.builtin.debug:
-        msg:
-          - "MCM: {{ 'created' if mcm_result is changed else 'already exists' }}"
-          - "OSMS: {{ 'created' if osms_result is changed else 'already exists' }}"
-          - "OSDC: {{ 'created' if (osdc_result is changed) else ('already exists' if osdc_exists else 'skipped - ISO missing') }}"

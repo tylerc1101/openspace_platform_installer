@@ -268,23 +268,6 @@ def validate_environment(env_path: Path, profile_kind: str, logger: logging.Logg
     logger.info("VALIDATION: Checking environment configuration")
     logger.info("=" * 60)
     
-    # Check Ansible collections
-    collections_dir = IMAGES_DIR / "ansible_collections"
-    if collections_dir.exists():
-        collections_found = []
-        for namespace_dir in collections_dir.iterdir():
-            if namespace_dir.is_dir() and not namespace_dir.name.startswith('.'):
-                for collection_dir in namespace_dir.iterdir():
-                    if collection_dir.is_dir():
-                        collections_found.append(f"{namespace_dir.name}.{collection_dir.name}")
-        
-        if collections_found:
-            logger.info(f"✓ Found Ansible collections: {', '.join(collections_found)}")
-        else:
-            logger.warning("⚠ No Ansible collections found in images/ansible_collections/")
-    else:
-        logger.warning("⚠ No ansible_collections directory found")
-    
     errors = []
     
     # Check for config.yml

@@ -97,7 +97,7 @@
 
     - name: Create network config for MCM enp1s0
       ansible.builtin.copy:
-        dest: /tmp/mcm-ifcfg-enp1s0
+        dest: /tmp/ifcfg-enp1s0
         content: |
           TYPE=Ethernet
           BOOTPROTO=static
@@ -168,7 +168,7 @@
 
     - name: Create network config for OSMS enp1s0
       ansible.builtin.copy:
-        dest: /tmp/osms-ifcfg-enp1s0
+        dest: /tmp/ifcfg-enp1s0
         content: |
           TYPE=Ethernet
           BOOTPROTO=static

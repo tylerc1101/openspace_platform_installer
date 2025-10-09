@@ -6,29 +6,6 @@
     images_dir: /var/lib/libvirt/config/images
 
   tasks:
-    # Debug - check collections
-    - name: Debug - Check Ansible collections path
-      ansible.builtin.debug:
-        msg: 
-          - "ANSIBLE_COLLECTIONS_PATH: {{ lookup('env', 'ANSIBLE_COLLECTIONS_PATH') }}"
-          - "Collections should be at: /install/images/ansible_collections"
-      delegate_to: localhost
-      run_once: true
-
-    - name: Debug - List collections directory
-      ansible.builtin.command: ls -la /install/images/ansible_collections/
-      delegate_to: localhost
-      run_once: true
-      register: collections_ls
-      ignore_errors: yes
-
-    - name: Debug - Show collections directory listing
-      ansible.builtin.debug:
-        var: collections_ls.stdout_lines
-      delegate_to: localhost
-      run_once: true
-      when: collections_ls is succeeded
-
     # Pre-flight checks
     - name: Ensure libvirt config directory exists
       ansible.builtin.file:
@@ -41,12 +18,11 @@
         msg: "Variable 'basekit' is not defined in group_vars"
       when: basekit is not defined
 
-    - name: Extract base-kit archive
-      ansible.builtin.unarchive:
-        src: "/install/images/{{ basekit }}"
+    - name: Copy base-kit config files
+      ansible.builtin.copy:
+        src: "/install/images/{{ basekit }}/config"
         dest: "/var/lib/libvirt/config"
         remote_src: no
-        extra_opts: ["--no-overwrite-dir"]
 
     - name: Check if hardened image exists
       ansible.builtin.stat:
@@ -64,17 +40,6 @@
       ansible.builtin.set_fact:
         mcm_exists: "{{ 'mcm' in existing_vms.stdout_lines }}"
 
-    - name: Create VM disk for MCM
-      ansible.builtin.command:
-        cmd: >
-          qemu-img create -f qcow2 
-          -F qcow2
-          -b {{ images_dir }}/9_5_hardened_image_vm.qcow2
-          /var/lib/libvirt/images/mcm.qcow2
-          500G
-      when: not mcm_exists
-      register: mcm_disk
-
     - name: Create VM - MCM
       ansible.builtin.command:
         cmd: >
@@ -83,7 +48,7 @@
           --memory {{ vm_mcm_memory | default(16384) }}
           --vcpus {{ vm_mcm_vcpus | default(8) }}
           --cpu host-passthrough
-          --disk /var/lib/libvirt/images/mcm.qcow2,format=qcow2,bus=virtio
+          --disk size=600,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
           --network bridge=br-prov,model=virtio
@@ -100,17 +65,6 @@
       ansible.builtin.set_fact:
         osms_exists: "{{ 'osms' in existing_vms.stdout_lines }}"
 
-    - name: Create VM disk for OSMS
-      ansible.builtin.command:
-        cmd: >
-          qemu-img create -f qcow2
-          -F qcow2
-          -b {{ images_dir }}/9_5_hardened_image_vm.qcow2
-          /var/lib/libvirt/images/osms.qcow2
-          600G
-      when: not osms_exists
-      register: osms_disk
-
     - name: Create VM - OSMS
       ansible.builtin.command:
         cmd: >
@@ -119,7 +73,7 @@
           --memory {{ vm_osms_memory | default(32768) }}
           --vcpus {{ vm_osms_vcpus | default(16) }}
           --cpu host-passthrough
-          --disk /var/lib/libvirt/images/osms.qcow2,format=qcow2,bus=virtio
+          --disk size=600,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
           --import
@@ -140,13 +94,6 @@
         path: "{{ images_dir }}/Rocky-9.4-x86_64-dvd.iso"
       register: rocky_iso_stat
 
-    - name: Create VM disk for OSDC provisioner
-      ansible.builtin.command:
-        cmd: qemu-img create -f qcow2 /var/lib/libvirt/images/osdc-provisioner.qcow2 100G
-      when: 
-        - not osdc_exists
-        - rocky_iso_stat.stat.exists
-
     - name: Create VM - OSDC provisioner
       ansible.builtin.command:
         cmd: >
@@ -155,13 +102,14 @@
           --memory {{ vm_osdc_memory | default(6144) }}
           --vcpus {{ vm_osdc_vcpus | default(4) }}
           --cpu host-passthrough
-          --disk /var/lib/libvirt/images/osdc-provisioner.qcow2,format=qcow2,bus=virtio
-          --cdrom {{ images_dir }}/Rocky-9.4-x86_64-dvd.iso
-          --os-variant rocky9
+          --disk size=100
+          --location {{ images_dir }}/Rocky-9.4-x86_64-dvd.iso,initrd=isolinux/initrd.img,kernel=isolinux/vmlinuz
+          --initrd-inject /var/lib/libvirt/config/vm_config/osdc/prov_vm_ks.cfg
+          --extra-args="inst.ks=file:/prov_vm_ks.cfg console=tty0"
+          --os-variant=rocky9
           --network bridge=br-iDRAC,model=virtio
           --noautoconsole
-          --graphics vnc
-          --boot uefi
+          --noautostart
       when: 
         - not osdc_exists
         - rocky_iso_stat.stat.exists

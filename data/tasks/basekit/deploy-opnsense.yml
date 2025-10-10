@@ -1,6 +1,33 @@
-- name: Run the opnsense deployment script
+- name: Prepare OPNsense ISO path for libvirt
   hosts: mgmt_kvm
   become: yes
+  vars:
+    opnsense_root: /var/lib/libvirt/config
+    opnsense_parent: /var/lib/libvirt/config/vm_config
+    opnsense_dir: /var/lib/libvirt/config/vm_config/opnsense
   tasks:
-    - name: Execute install_opensense.sh script (Will take a moment)
-      command: bash /var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh
+    - name: Ensure directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+      loop: ["{{ opnsense_root }}", "{{ opnsense_parent }}", "{{ opnsense_dir }}"]
+
+    - name: Grant qemu directory search via ACL (minimal exposure)
+      acl:
+        path: "{{ item }}"
+        entity: qemu
+        etype: user
+        permissions: x
+        state: present
+      loop: ["{{ opnsense_root }}", "{{ opnsense_parent }}", "{{ opnsense_dir }}"]
+
+    - name: Set SELinux file context for this nonstandard libvirt path
+      community.general.sefcontext:
+        target: "{{ opnsense_dir }}(/.*)?"
+        setype: svirt_image_t
+        state: present
+
+    - name: Restore SELinux contexts
+      command: restorecon -Rv "{{ opnsense_dir }}"
+      register: rc_restore
+      changed_when: "'restorecon' in rc_restore.stdout | default('')"

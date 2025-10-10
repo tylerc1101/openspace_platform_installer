@@ -56,7 +56,7 @@ all:
               ansible_user: "kratos"
               ansible_ssh_pass: "kratos"
               ansible_become_pass: "kratos"
-            opensense:
+            opnsense:
               wan_ip: "10.243.77.222"
                 
         osdc:

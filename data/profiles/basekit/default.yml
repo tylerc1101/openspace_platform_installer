@@ -81,7 +81,7 @@ steps:
 
   - id: configure_opnsense_config.xml
     description: "Configure OPNsense config.xml"
-    kind: bash
+    kind: ansible
     file: "tasks/basekit/configure-opnsense.yml"
     args:
       - "-e env_name={env}"
@@ -91,8 +91,8 @@ steps:
 
   - id: deploy_opnsense
     description: "Deploy OPNsense"
-    kind: python3
-    file: "tasks/basekit/deploy-opnsense.py"
+    kind: ansible
+    file: "tasks/basekit/deploy-opnsense.yml"
     on_failure: fail
     required: true
     timeout: 1800

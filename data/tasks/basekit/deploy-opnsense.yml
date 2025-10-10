@@ -1,0 +1,6 @@
+- name: Run the opnsense deployment script
+  hosts: localhost
+  become: yes
+  tasks:
+    - name: Execute install_opensense.sh script (Will take a moment)
+      command: bash /var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh

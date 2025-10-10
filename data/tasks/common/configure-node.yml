@@ -31,7 +31,7 @@
         path: /etc/rancher/rke2/config.yaml.d
         state: directory
         mode: '0755'
-      when: "'osms' in group_names"
+      when: inventory_hostname is search('osms')
 
     - name: Create 60-rancher.yaml
       copy:
@@ -41,14 +41,14 @@
           "system-default-registry": ""
           }
         mode: '0644'
-      when: "'osms' in group_names"
+      when: inventory_hostname is search('osms')
 
     - name: Ensure /etc/systemd/system/rke2-server.service.d exists
       file:
         path: /etc/systemd/system/rke2-server.service.d
         state: directory
         mode: '0755'
-      when: "'osms' in group_names"
+      when: inventory_hostname is search('osms')
 
     - name: Create override.conf for rke2-server
       copy:
@@ -57,14 +57,14 @@
           [Service]
           LimitNOFILE=infinity
         mode: '0644'
-      when: "'osms' in group_names"
+      when: inventory_hostname is search('osms')
 
     - name: Ensure /etc/systemd/system/rke2-agent.service.d exists
       file:
         path: /etc/systemd/system/rke2-agent.service.d
         state: directory
         mode: '0755'
-      when: "'osms' in group_names"
+      when: inventory_hostname is search('osms')
 
     - name: Create override.conf for rke2-agent
       copy:
@@ -73,7 +73,7 @@
           [Service]
           LimitNOFILE=infinity
         mode: '0644'
-      when: "'osms' in group_names"
+      when: inventory_hostname is search('osms')
 
     - name: Create rke2-canal.conf
       copy:
@@ -81,7 +81,7 @@
         content: |
           [keyfile]
           unmanaged-devices=interface-name:cali*;interface-name:flannel*
-      when: "'osms' in group_names"
+      when: inventory_hostname is search('osms')
 
     - name: Configure kernel modules for KubeVirt
       copy:

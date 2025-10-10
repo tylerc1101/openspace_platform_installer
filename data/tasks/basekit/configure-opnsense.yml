@@ -26,16 +26,16 @@
         content: |
           {{ template_content.content | b64decode | 
              regex_replace('__OSDC1_MAC__', hostvars['osdc1'].mac_address) |
-             regex_replace('__WAN_IP__', opnsense.wan_ip) |
+             regex_replace('__WAN_IP__', opnsense_cfg.wan_ip) |
              regex_replace('__WAN_GATEWAY__', customer_network.gateway) |
              regex_replace('__WAN_SUBNET__', customer_network.cidr | regex_replace('^/', '')) |
              regex_replace('__NTP_TIMESERVERS__', ntp.server) |
              regex_replace('__NTP_PREFER__', ntp.server) |
-             regex_replace('__OPNSENSE_HOSTNAME__', opnsense.hostname) |
+             regex_replace('__OPNSENSE_HOSTNAME__', opnsense_cfg.hostname) |
              regex_replace('__OPNSENSE_DOMAIN__', domain_name) |
-             regex_replace('__INTERFACE_WAN__', opnsense.wan_interface) |
-             regex_replace('__INTERFACE_LAN__', opnsense.lan_interface) |
-             regex_replace('__INTERFACE_OPT1__', opnsense.opt1_interface) }}
+             regex_replace('__INTERFACE_WAN__', opnsense_cfg.wan_interface) |
+             regex_replace('__INTERFACE_LAN__', opnsense_cfg.lan_interface) |
+             regex_replace('__INTERFACE_OPT1__', opnsense_cfg.opt1_interface) }}
         dest: "{{ output_file }}"
         mode: '0644'
 

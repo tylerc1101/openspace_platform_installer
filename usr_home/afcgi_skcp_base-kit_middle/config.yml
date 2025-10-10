@@ -66,3 +66,7 @@ all:
               ansible_host: 192.168.0.17
               interface: "enp1s0"
               mac_address: "30:3E:A7:2E:3A:8C"
+        other:
+          hosts:
+            localhost:
+              ansible_connection: local

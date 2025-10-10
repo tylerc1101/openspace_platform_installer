@@ -68,15 +68,26 @@ steps:
     required: true
     timeout: 1800
 
-  - id: generate_opnsense_config
-    description: "Generate OPNsense Configuration"
-    kind: ansible
-    file: "tasks/basekit/generate-opnsense-config.yml"
+# TODO
+#  - id: generate_opnsense_config
+#    description: "Generate OPNsense Configuration"
+#    kind: ansible
+#    file: "tasks/basekit/generate-opnsense-config.yml"
+#    args:
+#      - "-e env_name={env}"
+#    on_failure: fail
+#    required: true
+#    timeout: 300
+
+  - id: configure_opnsense_config.xml
+    description: "Configure OPNsense config.xml"
+    kind: bash
+    file: "tasks/basekit/configure-opnsense.yml"
     args:
       - "-e env_name={env}"
     on_failure: fail
     required: true
-    timeout: 300
+    timeout: 600
 
   - id: deploy_opnsense
     description: "Deploy OPNsense"

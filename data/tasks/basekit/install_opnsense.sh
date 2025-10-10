@@ -7,13 +7,13 @@ if [[ ! -f ${BASE_DIR}/config.xml ]]; then
     exit 1
 fi
 
-#echo "Generating Configuation ISO.."
-#genisoimage -output "${BASE_DIR}/opnsense_config.iso" -volid opnsense-config -joliet -rock -graft-points "/conf/config.xml=${BASE_DIR}/config.xml"
+echo "Generating Configuation ISO.."
+genisoimage -output "${BASE_DIR}/opnsense_config.iso" -volid opnsense-config -joliet -rock -graft-points "/conf/config.xml=${BASE_DIR}/config.xml"
 
-#if [[ $? -ne 0 ]]; then
-#    echo "Failed to create ISO. Quiting."
-#    exit 1
-#fi
+if [[ $? -ne 0 ]]; then
+    echo "Failed to create ISO. Quiting."
+    exit 1
+fi
 
 echo "Creating OPNSense VM.."
 virt-install \

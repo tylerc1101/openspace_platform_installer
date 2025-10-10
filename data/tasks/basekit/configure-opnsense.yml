@@ -7,6 +7,8 @@
     template_file: "/install/data/templates/opnsense/config_template.xml"
     output_dir: "/install/usr_home/{{ env_name }}/generated_files"
     output_file: "{{ output_dir }}/config.xml"
+  vars_files:
+    - "/install/usr_home/{{ env_name }}/group_vars/vms.yml"
   
   tasks:
     

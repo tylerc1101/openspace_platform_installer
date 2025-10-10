@@ -85,7 +85,6 @@ steps:
     file: "tasks/basekit/configure-opnsense.yml"
     args:
       - "-e env_name={env}"
-      - "-e /install/usr_home/{env}/group_vars/vms.yml"
     on_failure: fail
     required: true
     timeout: 600

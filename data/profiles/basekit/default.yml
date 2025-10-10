@@ -75,3 +75,5 @@ steps:
     on_failure: fail
     required: true
     timeout: 1800
+
+#  - id: Kratos Power Scripts (step 15 in instructions)

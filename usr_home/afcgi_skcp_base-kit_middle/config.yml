@@ -11,8 +11,9 @@ all:
           dns_servers: ["10.243.25.50", "10.243.25.53"]
 
         mgmt_network:
-          gateway: "192.168.2.1"
+          network: "192.168.2"
           cidr: "/24"
+          gateway: "192.168.2.1"
           dns_servers: ["192.168.2.1"]
 
         ntp:

@@ -101,28 +101,28 @@ opnsense_cfg:
       description: "OSDC-2"
       
     - hostname: "osdc"
-      ip: "{{ opnsense.vips.osdc }}"
+      ip: "{{ opnsense_cfg.vips.osdc }}"
       description: "OSDC VIP"
       
     - hostname: "osms"
-      ip: "{{ opnsense.vips.osms }}"
+      ip: "{{ opnsense_cfg.vips.osms }}"
       description: "OSMS VIP"
       
     - hostname: "api-osdc"
-      ip: "{{ opnsense.vips.api_osdc }}"
+      ip: "{{ opnsense_cfg.vips.api_osdc }}"
       description: "OSDC API VIP"
       
     - hostname: "api-osms"
-      ip: "{{ opnsense.vips.api_osms }}"
+      ip: "{{ opnsense_cfg.vips.api_osms }}"
       description: "OSMS API VIP"
       
     - hostname: "api-mcm"
-      ip: "{{ opnsense.vips.api_mcm }}"
+      ip: "{{ opnsense_cfg.vips.api_mcm }}"
       description: "MCM API VIP"
   
   # DNS wildcard entries
   dns_wildcards:
     - hostname: "*"
       domain: "mcm.{{ domain_name }}"
-      ip: "{{ opnsense.vips.mcm_wildcard }}"
+      ip: "{{ opnsense_cfg.vips.mcm_wildcard }}"
       description: "MCM Wildcard VIP"

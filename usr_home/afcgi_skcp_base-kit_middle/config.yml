@@ -1,10 +1,10 @@
 # inventory.yml
 all:
-  hosts:
-    localhost:
-      ansible_connection: local
   children:
     basekit:
+      hosts:
+        localhost:
+          ansible_connection: local
       vars:
         domain_name: "base-kit.kratos"
 

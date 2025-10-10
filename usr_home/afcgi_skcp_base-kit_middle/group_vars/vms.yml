@@ -10,7 +10,7 @@ opnsense:
   opt1_interface: "vtnet2"
   
   # WAN IP (can be overridden in host_vars)
-  wan_ip: "{{ hostvars['opensense'].wan_ip }}"
+  wan_ip: "{{ hostvars['opnsense'].wan_ip }}"
   
   # Virtual IP addresses
   vips:

@@ -2,8 +2,20 @@
   hosts: "{{ target_hosts }}"
   become: true
   tasks:
+    - name: Find matching RPM(s) on remote
+      find:
+        paths: /install/images/
+        patterns: "rke2-selinux*.rpm"
+        file_type: file
+      register: rke2_rpms
 
-    - yum:
-        name: "/install/images/rke2-selinux*.rpm"
+    - name: Fail if no RPM found
+      fail:
+        msg: "No rke2-selinux RPM found in /install/images/rpms"
+      when: rke2_rpms.matched == 0
+
+    - name: Install RPM(s)
+      yum:
+        name: "{{ rke2_rpms.files | map(attribute='path') | list }}"
         state: present
-        disable_gpg_check: yes
+        disable_gpg_check: true

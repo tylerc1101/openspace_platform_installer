@@ -4,7 +4,7 @@
   tasks:
     - name: Copy RPM to target
       ansible.builtin.copy:
-        src: "/install/images/rke2-selinux*.rpm"
+        src: "/install/images/rke2-selinux-0.18-1.el9.noarch.rpm"
         dest: "/tmp/"
         mode: "0644"
       register: copied_rpm

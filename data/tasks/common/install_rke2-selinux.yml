@@ -1,21 +1,17 @@
-- name: Install RKE2-selinux package
+- name: Copy and install RKE2-selinux RPM
   hosts: "{{ target_hosts }}"
   become: true
   tasks:
-    - name: Find matching RPM(s) on remote
-      find:
-        paths: /install/images/
-        patterns: "rke2-selinux*.rpm"
-        file_type: file
-      register: rke2_rpms
+    - name: Copy RPM to target
+      ansible.builtin.copy:
+        src: "/install/images/rpms/rke2-selinux*.rpm"
+        dest: "/tmp/"
+        mode: "0644"
+      register: copied_rpm
+      delegate_to: localhost
 
-    - name: Fail if no RPM found
-      fail:
-        msg: "No rke2-selinux RPM found in /install/images/rpms"
-      when: rke2_rpms.matched == 0
-
-    - name: Install RPM(s)
-      yum:
-        name: "{{ rke2_rpms.files | map(attribute='path') | list }}"
+    - name: Install RKE2-selinux RPM on remote
+      ansible.builtin.dnf:
+        name: "{{ copied_rpm.dest }}"
         state: present
         disable_gpg_check: true

@@ -1,6 +1,6 @@
 ---
 - name: Create OpenSpace VMs
-  hosts: mgmt_kvm
+  hosts: "{{ target_hosts | default('mgmt_kvm') }}"
   become: yes
   vars:
     images_dir: /var/lib/libvirt/config/images

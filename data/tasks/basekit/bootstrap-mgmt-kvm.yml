@@ -1,6 +1,6 @@
 ---
 - name: Bootstrap mgmt-kvm server
-  hosts: mgmt_kvm
+  hosts: "{{ target_hosts | default('mgmt_kvm') }}"
   become: true
 
   tasks:

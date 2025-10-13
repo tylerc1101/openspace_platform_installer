@@ -1,0 +1,55 @@
+- name: Copy files to mgmt_kvm
+  hosts: "{{ target_hosts | default('mgmt_kvm') }}"
+  vars:
+    env_name: "{{ env_name | mandatory }}"
+    output_dir: "/install/usr_home/{{ env_name }}/generated_files"
+    output_file: "{{ output_dir }}/config.xml"
+    opnsense_root: /var/lib/libvirt/config
+    opnsense_parent: /var/lib/libvirt/config/vm_config
+    opnsense_dir: /var/lib/libvirt/config/vm_config/opnsense
+
+  tasks:
+    
+    - name: Ensure directories exist
+      file:
+        path: "{{ item }}"
+        state: directory
+      loop: 
+        - "{{ opnsense_root }}"
+        - "{{ opnsense_parent }}"
+        - "{{ opnsense_dir }}"
+
+    - name: Copy generated config to mgmt_kvm
+      copy:
+        src: "{{ output_file }}"
+        dest: "/var/lib/libvirt/config/vm_config/opnsense/config.xml"
+        mode: '0644'
+
+    - name: Copy install script to mgmt_kvm
+      copy:
+        src: "/install/data/tasks/basekit/install_opnsense.sh"
+        dest: "/var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh"
+        mode: '0755'
+
+    - name: Grant qemu directory search via ACL (minimal exposure)
+      acl:
+        path: "{{ item }}"
+        entity: qemu
+        etype: user
+        permissions: x
+        state: present
+      loop: 
+        - "{{ opnsense_root }}"
+        - "{{ opnsense_parent }}"
+        - "{{ opnsense_dir }}"
+
+    - name: Set SELinux file context for this nonstandard libvirt path
+      community.general.sefcontext:
+        target: "{{ opnsense_dir }}(/.*)?"
+        setype: svirt_image_t
+        state: present
+
+    - name: Restore SELinux contexts
+      command: restorecon -Rv "{{ opnsense_dir }}"
+      register: rc_restore
+      changed_when: "'restorecon' in rc_restore.stdout | default('')"

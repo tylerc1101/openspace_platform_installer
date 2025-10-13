@@ -1,6 +1,6 @@
 ---
 - name: Generate OPNsense config from template with variable replacement
-  hosts: localhost
+  hosts: "{{ target_hosts | default('localhost') }}"
   
   vars:
     env_name: "{{ env_name | mandatory }}"
@@ -46,23 +46,3 @@
         dest: "{{ output_file }}"
         mode: '0644'
 
-- name: Copy files to mgmt_kvm
-  hosts: mgmt_kvm
-  vars:
-    env_name: "{{ env_name | mandatory }}"
-    output_dir: "/install/usr_home/{{ env_name }}/generated_files"
-    output_file: "{{ output_dir }}/config.xml"
-
-  tasks:
-
-    - name: Copy generated config to mgmt_kvm
-      copy:
-        src: "{{ output_file }}"
-        dest: "/var/lib/libvirt/config/vm_config/opnsense/config.xml"
-        mode: '0644'
-
-    - name: Copy install script to mgmt_kvm
-      copy:
-        src: "/install/data/tasks/basekit/install_opnsense.sh"
-        dest: "/var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh"
-        mode: '0755'

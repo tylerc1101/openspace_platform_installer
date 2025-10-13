@@ -21,17 +21,19 @@ requirements:
 steps:
   - id: copy_ssh_key
     description: "Copy SSH Key to mgmt_kvm"
+    hosts: 
+      - mgmt_kvm
     kind: ansible
     file: "tasks/common/copy_ssh_key.yml"
     args:
       - "-e env_name={env}"
-      - "-e target_hosts=mgmt_kvm"
-      - "-e ssh_pubkey_path=/install/usr_home/{env}/.ssh/onboarder_ssh_key.pub"
     on_failure: fail
     required: true
 
   - id: bootstrap_mgmt_kvm
     description: "Bootstrap Mgmt KVM"
+    hosts: 
+      - mgmt_kvm
     kind: ansible
     file: "tasks/basekit/bootstrap-mgmt-kvm.yml"
     on_failure: fail
@@ -40,30 +42,23 @@ steps:
 
   - id: deploy_vms
     description: "Deploy VMs"
+    hosts: 
+      - mgmt_kvm
     kind: ansible
     file: "tasks/basekit/deploy-vms.yml"
     on_failure: fail
     required: true
     timeout: 3600
 
-  - id: configure_mcm
-    description: "Configure MCM"
+  - id: configure_nodes
+    description: "Configure Node"
+    hosts:
+      - mcm
+      - osms
     kind: ansible
     file: "tasks/common/configure-node.yml"
     args:
       - "-e env_name={env}"
-      - "-e target_hosts=mcm"
-    on_failure: fail
-    required: true
-    timeout: 1800
-
-  - id: configure_osms
-    description: "Configure OSMS"
-    kind: ansible
-    file: "tasks/common/configure-node.yml"
-    args:
-      - "-e env_name={env}"
-      - "-e target_hosts=osms"
     on_failure: fail
     required: true
     timeout: 1800
@@ -79,8 +74,10 @@ steps:
 #    required: true
 #    timeout: 300
 
-  - id: configure_opnsense_config.xml
+  - id: configure_opnsense_config
     description: "Configure OPNsense config.xml"
+    hosts: 
+      - localhost
     kind: ansible
     file: "tasks/basekit/configure-opnsense.yml"
     args:
@@ -89,10 +86,25 @@ steps:
     required: true
     timeout: 600
 
+  - id: copy_opnsense_config
+    description: "Copy OPNsense config.xml to mgmt_kvm"
+    hosts: 
+      - mgmt_kvm
+    kind: ansible
+    file: "tasks/basekit/copy-opnsense-config.yml"
+    args:
+      - "-e env_name={env}"
+    on_failure: fail
+    required: true
+    timeout: 600
+
   - id: deploy_opnsense
     description: "Deploy OPNsense"
-    kind: ansible
-    file: "tasks/basekit/deploy-opnsense.yml"
+    hosts: 
+      - mgmt_kvm
+    iterate: false
+    kind: command
+    command: "bash /var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh"
     on_failure: fail
     required: true
     timeout: 1800

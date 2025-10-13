@@ -3,7 +3,7 @@
 Simple Installer Runner
 -----------------------
 Runs installation steps from a profile YAML file.
-Each step can be an Ansible playbook, Python script, or shell script.
+Each step can be an Ansible playbook or a direct command.
 """
 
 import argparse
@@ -38,20 +38,16 @@ def setup_logging(log_dir: Path, verbose: bool = False) -> logging.Logger:
     """Setup logging to both file and console with proper formatting."""
     log_dir.mkdir(parents=True, exist_ok=True)
     
-    # Create logger
     logger = logging.getLogger("onboarder")
     logger.setLevel(logging.DEBUG if verbose else logging.INFO)
     
-    # Prevent duplicate handlers
     if logger.handlers:
         return logger
     
-    # Console handler - simple format without logger name
+    # Console handler - simple format
     console_handler = logging.StreamHandler(sys.stdout)
     console_handler.setLevel(logging.DEBUG if verbose else logging.INFO)
-    console_format = logging.Formatter(
-        '%(message)s'  # Just the message, no timestamp or level for cleaner output
-    )
+    console_format = logging.Formatter('%(message)s')
     console_handler.setFormatter(console_format)
     
     # File handler with detailed info
@@ -65,8 +61,6 @@ def setup_logging(log_dir: Path, verbose: bool = False) -> logging.Logger:
     
     logger.addHandler(console_handler)
     logger.addHandler(file_handler)
-    
-    # Prevent propagation to root logger
     logger.propagate = False
     
     return logger
@@ -83,22 +77,78 @@ def load_yaml_file(file_path: Path) -> Dict[str, Any]:
         raise IOError(f"Cannot read {file_path}: {e}")
 
 
+def get_host_from_inventory(inventory_file: Path, host_or_group: str) -> Dict[str, Any]:
+    """
+    Get connection info for a host from inventory.
+    Returns dict with ansible_host, ansible_user, ansible_ssh_pass, etc.
+    """
+    try:
+        inventory = load_yaml_file(inventory_file)
+    except Exception as e:
+        raise ValueError(f"Failed to load inventory: {e}")
+    
+    def find_host(data: Dict, target: str, parent_vars: Dict = None) -> Optional[Dict]:
+        """Recursively search for host in inventory."""
+        parent_vars = parent_vars or {}
+        
+        # Merge parent vars
+        current_vars = parent_vars.copy()
+        if 'vars' in data:
+            current_vars.update(data['vars'])
+        
+        # Check hosts at this level
+        if 'hosts' in data and isinstance(data['hosts'], dict):
+            if target in data['hosts']:
+                host_data = data['hosts'][target].copy() if isinstance(data['hosts'][target], dict) else {}
+                host_data.update(current_vars)
+                return host_data
+        
+        # Check children
+        if 'children' in data and isinstance(data['children'], dict):
+            # Check if target is a group name
+            if target in data['children']:
+                group_data = data['children'][target]
+                # Return first host in this group
+                if 'hosts' in group_data and isinstance(group_data['hosts'], dict):
+                    first_host_name = list(group_data['hosts'].keys())[0]
+                    host_data = group_data['hosts'][first_host_name].copy()
+                    if 'vars' in group_data:
+                        host_data.update(group_data['vars'])
+                    host_data.update(current_vars)
+                    return host_data
+            
+            # Recurse into children
+            for child_name, child_data in data['children'].items():
+                result = find_host(child_data, target, current_vars)
+                if result:
+                    return result
+        
+        return None
+    
+    # Special case: localhost
+    if host_or_group == 'localhost':
+        return {'ansible_host': 'localhost', 'ansible_user': os.getenv('USER', 'root')}
+    
+    host_info = find_host(inventory.get('all', {}), host_or_group)
+    
+    if not host_info:
+        raise ValueError(f"Host or group '{host_or_group}' not found in inventory")
+    
+    return host_info
+
+
 def replace_placeholders(text: str, env_name: str, profile_name: str, 
                         profile_kind: str, group_vars: Dict[str, Any]) -> str:
     """
     Replace placeholders in text with actual values.
-    Supports:
-    - {env} - environment name
-    - {profile} - profile name  
-    - {profile_kind} - profile kind
-    - {variable_name} - any variable from group_vars
+    Supports: {env}, {profile}, {profile_kind}, {variable_name}
     """
     result = (text
               .replace("{env}", env_name)
               .replace("{profile}", profile_name)
               .replace("{profile_kind}", profile_kind))
     
-    # Replace any group_vars variables (like {onboarder}, {basekit}, etc.)
+    # Replace any group_vars variables
     for key, value in group_vars.items():
         if isinstance(value, (str, int, float, bool)):
             result = result.replace(f"{{{key}}}", str(value))
@@ -113,7 +163,6 @@ def find_step_file(file_path: str) -> Path:
     """
     path = Path(file_path)
     
-    # Don't allow absolute paths in profiles (except for custom usr_home scripts)
     if path.is_absolute():
         if str(path).startswith("/install/usr_home/"):
             return path
@@ -121,8 +170,155 @@ def find_step_file(file_path: str) -> Path:
             f"Use relative paths in profiles (relative to /install/data): {file_path}"
         )
     
-    # Relative to DATA_DIR
     return DATA_DIR / path
+
+
+def build_ssh_command(host_info: Dict[str, Any], remote_command: str) -> List[str]:
+    """Build SSH command to execute remote command with real-time output."""
+    ssh_cmd = []
+    
+    # Use sshpass if password is provided
+    if host_info.get('ansible_ssh_pass'):
+        ssh_cmd.extend(['sshpass', '-p', host_info['ansible_ssh_pass']])
+    
+    ssh_cmd.append('ssh')
+    
+    # SSH options for non-interactive, real-time output
+    ssh_cmd.extend([
+        '-o', 'StrictHostKeyChecking=no',
+        '-o', 'UserKnownHostsFile=/dev/null',
+        '-o', 'ConnectTimeout=30',
+        '-tt'  # Force TTY allocation for real-time output
+    ])
+    
+    # SSH key if specified
+    if host_info.get('ansible_ssh_private_key_file'):
+        ssh_cmd.extend(['-i', host_info['ansible_ssh_private_key_file']])
+    
+    # Port if not default
+    port = host_info.get('ansible_port', 22)
+    if port != 22:
+        ssh_cmd.extend(['-p', str(port)])
+    
+    # User@host
+    user = host_info.get('ansible_user', 'root')
+    host = host_info.get('ansible_host', 'localhost')
+    ssh_cmd.append(f"{user}@{host}")
+    
+    # Remote command
+    ssh_cmd.append(remote_command)
+    
+    return ssh_cmd
+
+
+def build_command(step: Dict[str, Any], step_file: Path, 
+                 inventory_file: Path, rendered_args: List[str],
+                 env_name: str, profile_name: str, profile_kind: str,
+                 group_vars: Dict[str, Any]) -> List[str]:
+    """Build the command to run based on step type."""
+    kind = step.get("kind", "").lower()
+    hosts = step.get("hosts", "localhost")
+    
+    # Handle 'command' kind - direct command execution
+    if kind == "command":
+        command = step.get("command")
+        if not command:
+            raise ValueError("'command' kind requires 'command' field")
+        
+        # Replace placeholders in command
+        rendered_command = replace_placeholders(
+            command, env_name, profile_name, profile_kind, group_vars
+        )
+        
+        # For command kind, we only handle single host
+        # (iteration is handled in main loop)
+        target_host = hosts
+        if isinstance(hosts, list):
+            target_host = hosts[0]  # Will be iterated in main loop
+        
+        if target_host == "localhost":
+            # Run locally using shell
+            return ["/bin/bash", "-c", rendered_command]
+        else:
+            # Run via SSH
+            host_info = get_host_from_inventory(inventory_file, target_host)
+            return build_ssh_command(host_info, rendered_command)
+    
+    # Handle 'ansible' kind - Ansible playbooks
+    elif kind == "ansible":
+        # Build ansible-playbook command
+        cmd = ["ansible-playbook", "-i", str(inventory_file), str(step_file)]
+        
+        # Convert hosts to comma-separated string for Ansible
+        if hosts and hosts != "localhost":
+            if isinstance(hosts, list):
+                hosts_str = ",".join(hosts)
+            else:
+                hosts_str = hosts
+            cmd.extend(["-e", f"target_hosts={hosts_str}"])
+        
+        # Add other arguments
+        cmd.extend(rendered_args)
+        
+        return cmd
+    
+    # Handle python/bash/shell kinds with 'file'
+    elif kind in ("python", "python3"):
+        return ["python3", str(step_file)] + rendered_args
+    
+    elif kind in ("shell", "bash", "sh"):
+        shell = "/bin/bash" if kind in ("bash", "shell") else "/bin/sh"
+        return [shell, str(step_file)] + rendered_args
+    
+    else:
+        raise ValueError(f"Unknown step kind: {kind}")
+
+
+def run_command(command: List[str], log_file: Path, timeout: Optional[int] = None) -> int:
+    """
+    Run a command and save output to a log file.
+    Returns the exit code (0 = success).
+    """
+    LOG_DIR.mkdir(parents=True, exist_ok=True)
+    
+    logging.info(f"Running: {' '.join(command)}")
+    
+    # Set up environment for ansible
+    env = os.environ.copy()
+    env["ANSIBLE_CONFIG"] = str(DATA_DIR / "ansible.cfg")
+    env["ANSIBLE_HOST_KEY_CHECKING"] = "False"
+    env["ANSIBLE_SSH_RETRIES"] = "3"
+    env["PYTHONUNBUFFERED"] = "1"
+    env["ANSIBLE_FORCE_COLOR"] = "true"
+    
+    try:
+        with open(log_file, 'w') as log:
+            process = subprocess.Popen(
+                command,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,  # Line buffered
+                cwd=str(BASE_DIR),
+                env=env
+            )
+            
+            # Print and log output line by line with immediate flush
+            for line in process.stdout:
+                print(line, end='', flush=True)  # Real-time output
+                log.write(line)
+                log.flush()
+            
+            exit_code = process.wait(timeout=timeout)
+            return exit_code
+            
+    except subprocess.TimeoutExpired:
+        logging.error(f"Command timed out after {timeout} seconds")
+        process.kill()
+        return 124  # Standard timeout exit code
+    except Exception as e:
+        logging.error(f"Failed to run command: {e}")
+        return 1
 
 
 def load_state() -> Dict[str, Any]:
@@ -146,54 +342,6 @@ def save_state(state: Dict[str, Any]) -> None:
         logging.error(f"Failed to save state: {e}")
 
 
-def run_command(command: List[str], log_file: Path, timeout: Optional[int] = None) -> int:
-    """
-    Run a command and save output to a log file.
-    Returns the exit code (0 = success).
-    """
-    LOG_DIR.mkdir(parents=True, exist_ok=True)
-    
-    logging.info(f"Running: {' '.join(command)}")
-    
-    # Set up environment for ansible
-    env = os.environ.copy()
-    env["ANSIBLE_CONFIG"] = str(DATA_DIR / "ansible.cfg")
-    env["ANSIBLE_HOST_KEY_CHECKING"] = "False"
-    env["ANSIBLE_SSH_RETRIES"] = "3"
-    # Force unbuffered output for real-time streaming
-    env["PYTHONUNBUFFERED"] = "1"
-    env["ANSIBLE_FORCE_COLOR"] = "true"
-    
-    try:
-        with open(log_file, 'w') as log:
-            process = subprocess.Popen(
-                command,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,  # Line buffered
-                cwd=str(BASE_DIR),
-                env=env
-            )
-            
-            # Print and log output line by line with immediate flush
-            for line in process.stdout:
-                print(line, end='', flush=True)  # Force flush immediately
-                log.write(line)
-                log.flush()  # Flush log file too
-            
-            exit_code = process.wait(timeout=timeout)
-            return exit_code
-            
-    except subprocess.TimeoutExpired:
-        logging.error(f"Command timed out after {timeout} seconds")
-        process.kill()
-        return 124  # Standard timeout exit code
-    except Exception as e:
-        logging.error(f"Failed to run command: {e}")
-        return 1
-
-
 def install_rpms(logger: logging.Logger) -> bool:
     """
     Install any RPMs found in /install/images/rpms/.
@@ -205,7 +353,6 @@ def install_rpms(logger: logging.Logger) -> bool:
         logger.info("No rpms directory found, skipping RPM installation")
         return True
     
-    # Find all .rpm files
     rpm_files = list(rpms_dir.glob("*.rpm"))
     
     if not rpm_files:
@@ -220,7 +367,6 @@ def install_rpms(logger: logging.Logger) -> bool:
     for rpm in rpm_files:
         logger.info(f"  - {rpm.name}")
     
-    # Install all RPMs at once
     rpm_paths = [str(rpm) for rpm in rpm_files]
     command = ["rpm", "-ivh", "--force"] + rpm_paths
     
@@ -240,120 +386,15 @@ def install_rpms(logger: logging.Logger) -> bool:
         return False
 
 
-def build_command(step: Dict[str, Any], step_file: Path, 
-                 inventory_file: Path, rendered_args: List[str]) -> List[str]:
-    """Build the command to run based on step type."""
-    kind = step.get("kind", "").lower()
-    
-    if kind == "ansible":
-        return ["ansible-playbook", "-i", str(inventory_file), str(step_file)] + rendered_args
-    
-    elif kind in ("python", "python3"):
-        return ["python3", str(step_file)] + rendered_args
-    
-    elif kind in ("shell", "bash", "sh"):
-        shell = "/bin/bash" if kind in ("bash", "shell") else "/bin/sh"
-        return [shell, str(step_file)] + rendered_args
-    
-    else:
-        raise ValueError(f"Unknown step kind: {kind}")
-
-
-def validate_environment(env_path: Path, profile_kind: str, logger: logging.Logger) -> bool:
-    """
-    Validate that the environment directory has all required files.
-    Returns True if valid, False otherwise.
-    """
-    logger.info("=" * 60)
-    logger.info("VALIDATION: Checking environment configuration")
-    logger.info("=" * 60)
-    
-    errors = []
-    
-    # Check for config.yml
-    inventory_file = env_path / "config.yml"
-    if not inventory_file.exists():
-        errors.append(f"Missing inventory file: {inventory_file}")
-    else:
-        logger.info(f"✓ Inventory file exists: {inventory_file}")
-        try:
-            load_yaml_file(inventory_file)
-            logger.info("✓ Inventory is valid YAML")
-        except Exception as e:
-            errors.append(f"Invalid inventory YAML: {e}")
-    
-    # Check for group_vars
-    group_vars_dir = env_path / "group_vars"
-    if not group_vars_dir.exists():
-        errors.append(f"Missing group_vars directory: {group_vars_dir}")
-    else:
-        logger.info(f"✓ Group vars directory exists: {group_vars_dir}")
-        
-        # Check for profile-specific group_vars
-        profile_vars = group_vars_dir / f"{profile_kind}.yml"
-        if not profile_vars.exists():
-            errors.append(f"Missing group vars for profile: {profile_vars}")
-        else:
-            logger.info(f"✓ Profile group vars exist: {profile_vars}")
-            
-            # Validate it has required keys
-            try:
-                gv = load_yaml_file(profile_vars)
-                if "profile_kind" not in gv:
-                    errors.append(f"Missing 'profile_kind' in {profile_vars}")
-                elif gv["profile_kind"] != profile_kind:
-                    errors.append(
-                        f"profile_kind mismatch: group_vars says '{gv['profile_kind']}' "
-                        f"but using '{profile_kind}'"
-                    )
-                else:
-                    logger.info(f"✓ profile_kind matches: {profile_kind}")
-                
-                if "profile_name" not in gv:
-                    errors.append(f"Missing 'profile_name' in {profile_vars}")
-                else:
-                    logger.info(f"✓ profile_name: {gv['profile_name']}")
-                    
-            except Exception as e:
-                errors.append(f"Failed to validate group_vars: {e}")
-    
-    # Check for SSH directory
-    ssh_dir = env_path / ".ssh"
-    if ssh_dir.exists():
-        logger.info(f"✓ SSH directory exists: {ssh_dir}")
-        # Check for common SSH keys
-        for key_name in ["onboarder_ssh_key", "rancher_ssh_key", "osdc_ssh_key", "osms_ssh_key"]:
-            pub_key = ssh_dir / f"{key_name}.pub"
-            if pub_key.exists():
-                logger.info(f"  ✓ Found: {key_name}.pub")
-    else:
-        logger.warning(f"⚠ No .ssh directory found (may be needed): {ssh_dir}")
-    
-    if errors:
-        logger.error("\n❌ VALIDATION FAILED:")
-        for error in errors:
-            logger.error(f"  - {error}")
-        return False
-    
-    logger.info("\n✅ Environment validation passed!")
-    logger.info("=" * 60)
-    return True
-
-
 def validate_profile(profile_file: Path, profile_data: Dict[str, Any], 
                      group_vars: Dict[str, Any], logger: logging.Logger) -> bool:
-    """
-    Validate that the profile file is properly structured and all referenced files exist.
-    Substitutes variables from group_vars during validation.
-    Returns True if valid, False otherwise.
-    """
+    """Validate profile structure and file existence."""
     logger.info("=" * 60)
     logger.info("VALIDATION: Checking profile configuration")
     logger.info("=" * 60)
     
     errors = []
     
-    # Check for required top-level keys
     if "steps" not in profile_data:
         errors.append(f"Profile must have 'steps' key: {profile_file}")
         return False
@@ -376,58 +417,49 @@ def validate_profile(profile_file: Path, profile_data: Dict[str, Any],
         logger.info(f"  Version: {metadata.get('version', 'Unknown')}")
         logger.info(f"  Description: {metadata.get('description', 'N/A')}")
     
-    # Check requirements if present
-    requirements = profile_data.get("requirements", {})
-    if requirements:
-        logger.info("\nChecking requirements...")
-        
-        # Check required images (substitute variables)
-        req_images = requirements.get("images", [])
-        for image_template in req_images:
-            # Substitute variables like {onboarder}
-            image = image_template
-            for key, value in group_vars.items():
-                if isinstance(value, str):
-                    image = image.replace(f"{{{key}}}", value)
-            
-            image_path = IMAGES_DIR / image
-            if not image_path.exists():
-                errors.append(f"Required image not found: {image_path}")
-            else:
-                logger.info(f"  ✓ Image exists: {image}")
-    
     # Validate each step
     logger.info("\nValidating steps...")
     for idx, step in enumerate(steps, 1):
         step_id = step.get("id", f"step_{idx}")
         kind = step.get("kind")
-        file_path = step.get("file")
         description = step.get("description", "No description")
         
         logger.info(f"\n  Step {idx}: {step_id}")
         logger.info(f"    Description: {description}")
         
-        # Check required fields
         if not kind:
             errors.append(f"Step '{step_id}' missing 'kind' field")
             continue
         
-        if not file_path:
-            errors.append(f"Step '{step_id}' missing 'file' field")
-            continue
-        
         logger.info(f"    Kind: {kind}")
-        logger.info(f"    File: {file_path}")
         
-        # Check if file exists
-        try:
-            step_file = find_step_file(file_path)
-            if not step_file.exists():
-                errors.append(f"Step '{step_id}' file not found: {step_file}")
+        # Validate based on kind
+        if kind == "command":
+            if not step.get("command"):
+                errors.append(f"Step '{step_id}' of kind 'command' missing 'command' field")
             else:
-                logger.info(f"    ✓ File exists")
-        except ValueError as e:
-            errors.append(f"Step '{step_id}': {e}")
+                logger.info(f"    Command: {step.get('command')}")
+        else:
+            file_path = step.get("file")
+            if not file_path:
+                errors.append(f"Step '{step_id}' missing 'file' field")
+                continue
+            
+            logger.info(f"    File: {file_path}")
+            
+            # Check if file exists
+            try:
+                step_file = find_step_file(file_path)
+                if not step_file.exists():
+                    errors.append(f"Step '{step_id}' file not found: {step_file}")
+                else:
+                    logger.info(f"    ✓ File exists")
+            except ValueError as e:
+                errors.append(f"Step '{step_id}': {e}")
+        
+        # Show hosts if specified
+        if step.get("hosts"):
+            logger.info(f"    Hosts: {step.get('hosts')}")
     
     if errors:
         logger.error("\n❌ PROFILE VALIDATION FAILED:")
@@ -468,15 +500,6 @@ def main():
     inventory_file = env_path / "config.yml"
     group_vars_file = env_path / "group_vars" / f"{profile_kind}.yml"
 
-    # Check if environment directory exists
-    if not env_path.exists():
-        logger.error(f"Environment directory not found: {env_path}")
-        return EXIT_CONFIG_ERROR
-    
-    # Validate environment
-    if not validate_environment(env_path, profile_kind, logger):
-        return EXIT_VALIDATION_FAILED
-    
     if not inventory_file.exists():
         logger.error(f"Config file not found: {inventory_file}")
         return EXIT_CONFIG_ERROR
@@ -485,34 +508,22 @@ def main():
         logger.error(f"Group vars file not found: {group_vars_file}")
         return EXIT_CONFIG_ERROR
 
-    # Load the profile name and kind from group_vars
+    # Load the profile name from group_vars
     try:
         group_vars = load_yaml_file(group_vars_file)
     except Exception as e:
         logger.error(f"Failed to load group vars: {e}")
         return EXIT_CONFIG_ERROR
     
-    # Get profile_kind and profile_name from group_vars
     if "profile_kind" not in group_vars:
         logger.error(f"Missing 'profile_kind' in {group_vars_file}")
-        logger.error("Add: profile_kind: basekit  # or baremetal, aws")
         return EXIT_CONFIG_ERROR
     
     if "profile_name" not in group_vars:
         logger.error(f"Missing 'profile_name' in {group_vars_file}")
-        logger.error("Add: profile_name: default  # or custom, minimal, etc.")
         return EXIT_CONFIG_ERROR
     
-    gv_profile_kind = group_vars["profile_kind"]
     profile_name = group_vars["profile_name"]
-    
-    # Verify it matches what we're trying to use
-    if gv_profile_kind != profile_kind:
-        logger.error(
-            f"Profile kind mismatch: group_vars declares '{gv_profile_kind}' "
-            f"but script is using '{profile_kind}'"
-        )
-        return EXIT_CONFIG_ERROR
     
     # Find the profile file
     profile_file = DATA_DIR / "profiles" / profile_kind / f"{profile_name}.yml"
@@ -555,8 +566,6 @@ def main():
     state["env"] = env_name
     state["profile_kind"] = profile_kind
     state["profile_name"] = profile_name
-    state["inventory"] = str(inventory_file)
-    state["profile_file"] = str(profile_file)
     
     if "steps" not in state:
         state["steps"] = {}
@@ -570,14 +579,14 @@ def main():
         step_id = str(step.get("id", index))
         description = step.get("description") or step.get("desc") or "No description"
         kind = step.get("kind", "")
-        file_path = step.get("file")
-        step_args = step.get("args") or []
         timeout = step.get("timeout")
         on_failure = step.get("on_failure", "fail")
+        hosts = step.get("hosts", "localhost")
+        iterate = step.get("iterate", False)  # Whether to run command on each host
 
-        # Skip if no kind or file
-        if not kind or not file_path:
-            logger.warning(f"[{step_id}] SKIPPING: Missing kind or file")
+        # Skip if no kind
+        if not kind:
+            logger.warning(f"[{step_id}] SKIPPING: Missing kind")
             state["steps"][step_id] = {"status": "skipped"}
             save_state(state)
             continue
@@ -587,91 +596,137 @@ def main():
             logger.info(f"[{step_id}] SKIPPING: Already completed - {description}")
             continue
 
-        # Find the step file
-        try:
-            step_file = find_step_file(file_path)
-        except ValueError as e:
-            logger.error(f"[{step_id}] ERROR: {e}")
-            state["steps"][step_id] = {"status": "failed", "error": str(e)}
-            save_state(state)
-            return EXIT_FILE_NOT_FOUND
+        # Determine if we need to iterate through hosts
+        should_iterate = False
+        hosts_list = []
         
-        if not step_file.exists():
-            logger.error(f"[{step_id}] ERROR: File not found: {step_file}")
-            state["steps"][step_id] = {"status": "failed", "error": "file not found"}
-            save_state(state)
-            return EXIT_FILE_NOT_FOUND
-
-        # Replace placeholders in arguments (including group_vars variables)
-        rendered_args = [
-            replace_placeholders(arg, env_name, profile_name, profile_kind, group_vars)
-            for arg in step_args
-        ]
-
-        # Build the command
-        try:
-            command = build_command(step, step_file, inventory_file, rendered_args)
-        except ValueError as e:
-            logger.error(f"[{step_id}] ERROR: {e}")
-            state["steps"][step_id] = {"status": "failed", "error": str(e)}
-            save_state(state)
-            return EXIT_UNSUPPORTED_KIND
-
-        # Create log file name
-        safe_desc = description.replace(" ", "_").replace("/", "-")
-        log_file = LOG_DIR / f"{step_id}-{safe_desc}.log"
-
-        # Update state to "running"
-        print()  # Blank line for separation
-        logger.info("=" * 70)
-        logger.info(f"STEP {index}/{len(steps)}: {description}")
-        logger.info("=" * 70)
-        if timeout:
-            logger.info(f"Timeout: {timeout}s")
-        logger.info("")  # Blank line before output
+        if kind == "command" and iterate and isinstance(hosts, list) and len(hosts) > 1:
+            should_iterate = True
+            hosts_list = hosts
         
-        logger.debug(f"About to save state and run command for step {step_id}")
-        
-        state["steps"][step_id] = {
-            "status": "running",
-            "log": str(log_file),
-            "kind": kind,
-            "file": str(step_file),
-            "description": description
-        }
-        save_state(state)
+        # If not iterating, treat as single execution
+        if not should_iterate:
+            hosts_list = [None]  # Single execution
 
-        logger.debug(f"Calling run_command: {' '.join(command)}")
-        
-        # Run the command
-        exit_code = run_command(command, log_file, timeout)
-        
-        logger.debug(f"run_command returned exit_code: {exit_code}")
-
-        # Update state based on result
-        if exit_code == 0:
-            print()  # Blank line
-            logger.info("✅ SUCCESS")
-            logger.info("")
-            state["steps"][step_id]["status"] = "ok"
-            state["steps"][step_id]["exit_code"] = 0
-        else:
-            print()  # Blank line
-            logger.error("❌ FAILED")
-            logger.error(f"Exit code: {exit_code}")
-            logger.error(f"Log: {log_file}")
-            logger.error("")
-            state["steps"][step_id]["status"] = "failed"
-            state["steps"][step_id]["exit_code"] = exit_code
-            save_state(state)
-            
-            # Handle failure based on on_failure setting
-            if on_failure == "continue":
-                logger.warning("⚠️  Continuing despite failure")
+        # Execute for each host (or once if not iterating)
+        for host_idx, current_host in enumerate(hosts_list, 1):
+            # Update step to use current host if iterating
+            if should_iterate:
+                step_for_exec = step.copy()
+                step_for_exec["hosts"] = current_host
+                suffix = f"_{current_host}"
+                current_description = f"{description} (on {current_host})"
             else:
-                return EXIT_STEP_FAILED
+                step_for_exec = step
+                suffix = ""
+                current_description = description
 
-        save_state(state)
+            # Handle command kind
+            if kind == "command":
+                command = step_for_exec.get("command")
+                if not command:
+                    logger.error(f"[{step_id}] ERROR: 'command' kind requires 'command' field")
+                    state["steps"][step_id] = {"status": "failed", "error": "missing command"}
+                    save_state(state)
+                    return EXIT_CONFIG_ERROR
+                
+                step_file = None
+                rendered_args = []
+            else:
+                # Handle file-based kinds
+                file_path = step_for_exec.get("file")
+                if not file_path:
+                    logger.warning(f"[{step_id}] SKIPPING: Missing file")
+                    state["steps"][step_id] = {"status": "skipped"}
+                    save_state(state)
+                    continue
+                
+                # Find the step file
+                try:
+                    step_file = find_step_file(file_path)
+                except ValueError as e:
+                    logger.error(f"[{step_id}] ERROR: {e}")
+                    state["steps"][step_id] = {"status": "failed", "error": str(e)}
+                    save_state(state)
+                    return EXIT_FILE_NOT_FOUND
+                
+                if not step_file.exists():
+                    logger.error(f"[{step_id}] ERROR: File not found: {step_file}")
+                    state["steps"][step_id] = {"status": "failed", "error": "file not found"}
+                    save_state(state)
+                    return EXIT_FILE_NOT_FOUND
+                
+                # Replace placeholders in arguments
+                step_args = step_for_exec.get("args") or []
+                rendered_args = [
+                    replace_placeholders(arg, env_name, profile_name, profile_kind, group_vars)
+                    for arg in step_args
+                ]
+
+            # Build the command
+            try:
+                command = build_command(step_for_exec, step_file, inventory_file, rendered_args,
+                                       env_name, profile_name, profile_kind, group_vars)
+            except ValueError as e:
+                logger.error(f"[{step_id}] ERROR: {e}")
+                state["steps"][step_id] = {"status": "failed", "error": str(e)}
+                save_state(state)
+                return EXIT_UNSUPPORTED_KIND
+
+            # Create log file name
+            safe_desc = current_description.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
+            log_file = LOG_DIR / f"{step_id}{suffix}-{safe_desc}.log"
+
+            # Update state to "running"
+            print()  # Blank line for separation
+            logger.info("=" * 70)
+            if should_iterate:
+                logger.info(f"STEP {index}/{len(steps)}.{host_idx}: {current_description}")
+            else:
+                logger.info(f"STEP {index}/{len(steps)}: {current_description}")
+            logger.info("=" * 70)
+            if step_for_exec.get("hosts"):
+                logger.info(f"Target: {step_for_exec.get('hosts')}")
+            if timeout:
+                logger.info(f"Timeout: {timeout}s")
+            logger.info("")  # Blank line before output
+            
+            state_key = f"{step_id}{suffix}" if should_iterate else step_id
+            state["steps"][state_key] = {
+                "status": "running",
+                "log": str(log_file),
+                "kind": kind,
+                "description": current_description
+            }
+            save_state(state)
+
+            # Run the command
+            exit_code = run_command(command, log_file, timeout)
+
+            # Update state based on result
+            if exit_code == 0:
+                print()  # Blank line
+                logger.info("✅ SUCCESS")
+                logger.info("")
+                state["steps"][state_key]["status"] = "ok"
+                state["steps"][state_key]["exit_code"] = 0
+            else:
+                print()  # Blank line
+                logger.error("❌ FAILED")
+                logger.error(f"Exit code: {exit_code}")
+                logger.error(f"Log: {log_file}")
+                logger.error("")
+                state["steps"][state_key]["status"] = "failed"
+                state["steps"][state_key]["exit_code"] = exit_code
+                save_state(state)
+                
+                # Handle failure based on on_failure setting
+                if on_failure == "continue":
+                    logger.warning("⚠️  Continuing despite failure")
+                else:
+                    return EXIT_STEP_FAILED
+
+            save_state(state)
 
     logger.info("\n" + "=" * 70)
     logger.info("✅ ALL STEPS COMPLETED SUCCESSFULLY!")

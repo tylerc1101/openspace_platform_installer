@@ -1,5 +1,5 @@
 - name: Install RKE2-selinux package
-  hosts: 
+  hosts: "{{ target_hosts }}"
   dnf:
     name: "/install/images/rpms/rke2-selinux*.rpm"
     state: present

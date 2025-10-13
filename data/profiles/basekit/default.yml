@@ -63,6 +63,18 @@ steps:
     required: true
     timeout: 1800
 
+  - id: install_rke2_selinux
+    description: "Install RKE2 SELinux Package"
+    hosts:
+      - mcm
+      - osms
+    kind: ansible
+    file: "tasks/common/install_rke2-selinux.yml"
+    args:
+    on_failure: fail
+    required: true
+    timeout: 600
+
 # TODO
 #  - id: generate_opnsense_config
 #    description: "Generate OPNsense Configuration"

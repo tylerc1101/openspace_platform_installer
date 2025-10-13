@@ -1,0 +1,48 @@
+- name: Prep Onboarder Container
+  hosts: "{{ target_hosts | default('localhost')}}"
+  vars:
+    env_name: "{{ env_name | mandatory }}"
+    config_dir: "/docker-workspace/config"
+    cluster_dir: "{{ config_dir }}/{{ clusters.mcm }}"
+    sample_vsphere_dir: "{{ config_dir }}/sample-vsphere"
+    cache_dir: "{{ cluster_dir }}/.cache"
+  vars_files:
+    - "/install/usr_home/{{ env_name }}/group_vars/vms.yml"
+  tasks:
+    # a) Build directories
+    - name: Check if "{{ cluster_dir }}" directory exists inside container
+      stat:
+        path: "{{ cluster_dir }}"
+      register: target_dir
+
+    - name: Copy sample config if missing
+      copy:
+        src: "{{ sample_vsphere_dir }}/"
+        dest: "{{ cluster_dir }}"
+      when: not target_dir.stat.exists
+
+    - name: Ensure .cache directory exists
+      file:
+        path: "{{ cache_dir }}"
+        state: directory
+        mode: '0755'
+        owner: root
+        group: root
+
+    # b) Modify Makefiles
+    - name: Deploy Makefile
+      template:
+        src: /install/data/templates/basekit_makefile.j2
+        dest: "{{ cluster_dir }}/Makefile"
+        owner: root
+        group: root
+        mode: '0644'
+
+    # c) Create terraform state file
+    - name: Create vm-terraform.tfstate inside container
+      template:
+        src: /install/data/templates/basekit_vm-terraform.tfstate.j2
+        dest: "{{ cache_dir }}/vm-terraform.tfstate"
+        owner: root
+        group: root
+        mode: '0644'

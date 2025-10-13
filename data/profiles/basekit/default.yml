@@ -19,7 +19,7 @@ requirements:
     - "/install/usr_home/{env}/.ssh/onboarder_ssh_key.pub"
 
 steps:
-  - id: copy_ssh_key
+  - id: copy_mgmt_kvm_ssh_key
     description: "Copy SSH Key to mgmt_kvm"
     hosts: 
       - mgmt_kvm
@@ -27,6 +27,7 @@ steps:
     file: "tasks/common/copy_ssh_key.yml"
     args:
       - "-e env_name={env}"
+      - "-e ssh_pubkey_path=/install/usr_home/{env}/.ssh/onboarder_ssh_key.pub"
     on_failure: fail
     required: true
 
@@ -55,6 +56,8 @@ steps:
     hosts:
       - mcm
       - osms
+      - osdc1
+      - osdc2
     kind: ansible
     file: "tasks/common/configure-node.yml"
     args:
@@ -120,5 +123,119 @@ steps:
     on_failure: fail
     required: true
     timeout: 1800
+
+  - id: prep_onboarder_container
+    description: "Prep Onboarder Container"
+    hosts: 
+      - localhost
+    kind: ansible
+    file: "tasks/common/prep_onboarder_container.yml"
+    args:
+      - "-e env_name={env}"
+    on_failure: fail
+    required: true
+    timeout: 600
+
+  - id: copy_mcm_ssh_key
+    description: "Copy SSH Key to MCM"
+    hosts: 
+      - mcm
+    kind: ansible
+    file: "tasks/common/copy_ssh_key.yml"
+    args:
+      - "-e env_name={env}"
+      - "-e ssh_pubkey_path=/install/usr_home/{env}/.ssh/rancher_ssh_key.pub"
+    on_failure: fail
+    required: true
+
+  - id: deploy_rke2_cluster
+    description: "Deploy RKE2 Cluster"
+    hosts: 
+      - localhost
+    kind: command
+    command: "make -C /docker-workspace ansible-deploy-rke2-cluster ENVIRONMENT={{ clusters.mcm }}"
+    on_failure: fail
+    required: true
+    timeout: 3600
+
+  - id: bootstrap_container_images
+    description: "Bootstrap Container Images"
+    hosts: 
+      - localhost
+    kind: command
+    command: "make -C /docker-workspace bootstrap-container-images-run ENVIRONMENT={{ clusters.mcm }}"
+    on_failure: fail
+    required: true
+    timeout: 3600
+
+  - id: deploy_harbor
+    description: "Deploy Harbor to the cluster"
+    hosts: 
+      - localhost
+    kind: command
+    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={{ clusters.mcm }}"
+    on_failure: fail
+    required: true
+    timeout: 3600
+
+  - id: load_darksite_bundles
+    description: "Load Darksite Bundles"
+    hosts: 
+      - localhost
+    kind: command
+    command: "make -C /docker-workspace load-darksite-bundles ENVIRONMENT={{ clusters.mcm }}"
+    on_failure: fail
+    required: true
+    timeout: 3600
+
+  - id: deploy_rancher
+    description: "Deploy Rancher to the cluster"
+    hosts: 
+      - localhost
+    kind: command
+    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={{ clusters.mcm }}"
+    on_failure: fail
+    required: true
+    timeout: 3600
+
+  - id: terraform_rancher
+    description: "Terraform Rancher Configuration"
+    hosts: 
+      - localhost
+    kind: command
+    command: "make -C /docker-workspace terraform-rancher-bootstrap-apply ENVIRONMENT={{ clusters.mcm }}"
+    on_failure: fail
+    required: true
+    timeout: 1800
+
+  - id: deploy_gitea
+    description: "Deploy Gitea to the cluster"
+    hosts: 
+      - localhost
+    kind: command
+    command: "make -C /docker-workspace install-gitea ENVIRONMENT={{ clusters.mcm }}"
+    on_failure: fail
+    required: true
+    timeout: 3600
+
+  - id: deploy_argocd
+    description: "Deploy ArgoCD to the cluster"
+    hosts: 
+      - localhost
+    kind: command
+    command: "make -C /docker-workspace install-argocd ENVIRONMENT={{ clusters.mcm }}"
+    on_failure: fail
+    required: true
+    timeout: 3600
+
+  - id: pause_for_gitea_patching
+    description: "Pause for Gitea Patching"
+    hosts: 
+      - localhost
+    kind: command
+    command: "echo \"Complete gitea patching\"; read -p \"Ready to continue? Y/N: \" ans; [[ \"$ans\" =~ ^[Yy]$ ]] || exit 1"
+    on_failure: fail
+    required: true
+    timeout: 3600
 
 #  - id: Kratos Power Scripts (step 15 in instructions)

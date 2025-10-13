@@ -78,17 +78,6 @@ steps:
     required: true
     timeout: 600
 
-# TODO
-#  - id: generate_opnsense_config
-#    description: "Generate OPNsense Configuration"
-#    kind: ansible
-#    file: "tasks/basekit/generate-opnsense-config.yml"
-#    args:
-#      - "-e env_name={env}"
-#    on_failure: fail
-#    required: true
-#    timeout: 300
-
   - id: configure_opnsense_config
     description: "Configure OPNsense config.xml"
     hosts: 

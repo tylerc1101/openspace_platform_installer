@@ -1,0 +1,6 @@
+- name: Install RKE2-selinux package
+  hosts: 
+  dnf:
+    name: "/install/images/rpms/rke2-selinux*.rpm"
+    state: present
+    disable_gpg_check: yes

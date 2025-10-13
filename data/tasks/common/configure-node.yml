@@ -7,6 +7,39 @@
       hostname:
         name: "{{ inventory_hostname }}.{{ domain_name }}"
 
+    - name: Update /etc/resolv.conf with customer DNS servers
+      lineinfile:
+        path: /etc/resolv.conf
+        line: "nameserver {{ item }}"
+        create: yes
+        state: present
+      loop: "{{ customer_network.dns_servers }}"
+
+    - name: Create repo file
+      copy:
+        src: /install/data/files/kratos.repo
+        dest: /etc/yum.repos.d/kratos.repo
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Install required packages
+      yum:
+        name:
+          - nfs-utils
+          - chrony
+          - make
+          - tar
+          - tuned
+          - container-selinux
+          - iscsi-initiator-utils
+          - iptables
+          - ipvsadm
+          - bind-utils
+          - bash-completion
+        state: present
+        disable_gpg_check: yes
+
     - name: Configure chrony
       copy:
         dest: /etc/chrony.conf
@@ -31,7 +64,6 @@
         path: /etc/rancher/rke2/config.yaml.d
         state: directory
         mode: '0755'
-      when: inventory_hostname is search('osms')
 
     - name: Create 60-rancher.yaml
       copy:
@@ -41,7 +73,6 @@
           "system-default-registry": ""
           }
         mode: '0644'
-      when: inventory_hostname is search('osms')
 
     - name: Ensure /etc/systemd/system/rke2-server.service.d exists
       file:
@@ -96,6 +127,7 @@
         name: iscsid
         enabled: yes
         state: started
+      when: inventory_hostname is search('mcm')
 
     - name: Disable and stop firewalld
       systemd:

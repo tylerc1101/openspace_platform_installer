@@ -108,7 +108,7 @@ steps:
       - mgmt_kvm
     iterate: false
     kind: command
-    command: "bash /var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh"
+    command: "sudo bash /var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh"
     on_failure: fail
     required: true
     timeout: 1800

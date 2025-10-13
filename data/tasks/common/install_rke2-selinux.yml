@@ -1,6 +1,6 @@
 - name: Install RKE2-selinux package
   hosts: "{{ target_hosts }}"
   dnf:
-    name: "/install/images/rpms/rke2-selinux*.rpm"
+    name: "/install/images/rke2-selinux*.rpm"
     state: present
     disable_gpg_check: yes

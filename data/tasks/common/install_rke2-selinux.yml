@@ -1,5 +1,6 @@
 - name: Install RKE2-selinux package
   hosts: "{{ target_hosts }}"
+  become: true
   tasks:
 
     - yum:

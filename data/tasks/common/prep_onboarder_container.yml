@@ -45,3 +45,12 @@
         owner: root
         group: root
         mode: '0644'
+
+    # d) Copy SSH Key into cache dir
+    - name: Copy ssh_key into .cache directory
+      copy:
+        src: "/install/usr_home/{{ env_name }}/.ssh/rancher_ssh_key.pub"
+        dest: "{{ cache_dir }}/rancher_ssh_key"
+        owner: root
+        group: root
+        mode: '0600'

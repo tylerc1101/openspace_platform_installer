@@ -334,7 +334,7 @@ def run_onboarder_container(
         "-u", f"{uid}:{gid}",
         "-v", f"{DATA_DIR}:/install/data:{selinux_opt}",
         "-v", f"{IMAGES_DIR}:/install/images:{selinux_opt}",
-        "-v", f"{env_dir}:/install/usr_home/{env_name}:{selinux_opt}",
+        "-v", f"{env_dir}:/docker-workspace/config/{env_name}:{selinux_opt}",
         "-v", f"{log_dir}:/install/logs:{selinux_opt}",
         "-w", "/install",
         image_ref

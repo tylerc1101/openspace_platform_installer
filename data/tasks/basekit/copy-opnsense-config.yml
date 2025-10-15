@@ -2,7 +2,7 @@
   hosts: "{{ target_hosts | default('mgmt_kvm') }}"
   vars:
     env_name: "{{ env_name | mandatory }}"
-    output_dir: "/install/usr_home/{{ env_name }}/generated_files"
+    output_dir: "/docker-workspace/config/{{ env_name }}/generated_files"
     output_file: "{{ output_dir }}/config.xml"
     opnsense_root: /var/lib/libvirt/config
     opnsense_parent: /var/lib/libvirt/config/vm_config

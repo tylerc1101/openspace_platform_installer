@@ -6,7 +6,7 @@
   
   vars:
     env_name: "{{ env_name | mandatory }}"
-    output_dir: "/install/usr_home/{{ env_name }}/generated_files"
+    output_dir: "/docker-workspace/config/{{ env_name }}/generated_files"
     output_file: "{{ output_dir }}/config.xml"
     template_file: "/install/data/templates/opnsense/config.xml.j2"
     

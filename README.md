@@ -129,7 +129,7 @@ requirements:
   inventory_groups:
     - mgmt_kvm
   files:
-    - "/install/usr_home/{env}/.ssh/onboarder_ssh_key.pub"
+    - "/docker-workspace/config/{env}/.ssh/onboarder_ssh_key.pub"
 
 steps:
   - id: copy_ssh_key
@@ -225,7 +225,7 @@ The runner script:
 3. Mounts necessary directories:
    - `/install/data` → `./data/`
    - `/install/images` → `./images/`
-   - `/install/usr_home/{env}` → `./usr_home/{env}/`
+   - `/docker-workspace/config/{env}` → `./usr_home/{env}/`
    - `/install/logs` → `./usr_home/{env}/logs/`
 4. Executes `main.py` inside the container
 

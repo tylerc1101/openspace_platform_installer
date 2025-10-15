@@ -62,7 +62,7 @@
     # d) Copy SSH Key into cache dir
     - name: Copy ssh_key into .cache directory
       copy:
-        src: "/install/usr_home/{{ env_name }}/.ssh/rancher_ssh_key"
+        src: "/docker-workspace/config/{{ env_name }}/.ssh/rancher_ssh_key"
         dest: "{{ cache_dir }}/rancher_ssh_key"
         owner: root
         group: root

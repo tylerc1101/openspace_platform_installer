@@ -29,7 +29,7 @@ def run_command(cmd, check=True):
 
 def check_config_exists(env_name):
     """Check if config.xml was generated"""
-    config_path = Path(f"/install/usr_home/{env_name}/files/opnsense/config.xml")
+    config_path = Path(f"/docker-workspace/config/{env_name}/files/opnsense/config.xml")
     
     if not config_path.exists():
         log("❌ config.xml not found!")

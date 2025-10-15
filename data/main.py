@@ -164,7 +164,7 @@ def find_step_file(file_path: str) -> Path:
     path = Path(file_path)
     
     if path.is_absolute():
-        if str(path).startswith("/install/usr_home/"):
+        if str(path).startswith("/docker-workspace/config/"):
             return path
         raise ValueError(
             f"Use relative paths in profiles (relative to /install/data): {file_path}"

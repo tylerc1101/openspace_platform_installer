@@ -16,7 +16,7 @@ requirements:
   
   # Environment files that must exist
   files:
-    - "/install/usr_home/{env}/.ssh/onboarder_ssh_key.pub"
+    - "/docker-workspace/config/{env}/.ssh/onboarder_ssh_key.pub"
 
 steps:
   - id: copy_mgmt_kvm_ssh_key
@@ -27,7 +27,7 @@ steps:
     file: "tasks/common/copy_ssh_key.yml"
     args:
       - "-e env_name={env}"
-      - "-e ssh_pubkey_path=/install/usr_home/{env}/.ssh/onboarder_ssh_key.pub"
+      - "-e ssh_pubkey_path=/docker-workspace/config/{env}/.ssh/onboarder_ssh_key.pub"
     on_failure: fail
     required: true
 
@@ -133,7 +133,7 @@ steps:
     file: "tasks/common/copy_ssh_key.yml"
     args:
       - "-e env_name={env}"
-      - "-e ssh_pubkey_path=/install/usr_home/{env}/.ssh/rancher_ssh_key.pub"
+      - "-e ssh_pubkey_path=/docker-workspace/config/{env}/.ssh/rancher_ssh_key.pub"
     on_failure: fail
     required: true
 
@@ -142,7 +142,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace ansible-deploy-rke2-cluster ENVIRONMENT={env}"
+    command: "make -C /docker-workspace ansible-deploy-rke2-cluster ENVIRONMENT={env}/generated_files"
     on_failure: fail
     required: true
     timeout: 3600
@@ -152,7 +152,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace bootstrap-container-images-run ENVIRONMENT={env}"
+    command: "make -C /docker-workspace bootstrap-container-images-run ENVIRONMENT={env}/generated_files"
     on_failure: fail
     required: true
     timeout: 3600
@@ -162,7 +162,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={env}"
+    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={env}/generated_files"
     on_failure: fail
     required: true
     timeout: 3600
@@ -172,7 +172,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace load-darksite-bundles ENVIRONMENT={env}"
+    command: "make -C /docker-workspace load-darksite-bundles ENVIRONMENT={env}/generated_files"
     on_failure: fail
     required: true
     timeout: 3600
@@ -182,7 +182,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={env}"
+    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={env}/generated_files"
     on_failure: fail
     required: true
     timeout: 3600
@@ -192,7 +192,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace terraform-rancher-bootstrap-apply ENVIRONMENT={env}"
+    command: "make -C /docker-workspace terraform-rancher-bootstrap-apply ENVIRONMENT={env}/generated_files"
     on_failure: fail
     required: true
     timeout: 1800
@@ -202,7 +202,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace install-gitea ENVIRONMENT={env}"
+    command: "make -C /docker-workspace install-gitea ENVIRONMENT={env}/generated_files"
     on_failure: fail
     required: true
     timeout: 3600
@@ -212,7 +212,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace install-argocd ENVIRONMENT={env}"
+    command: "make -C /docker-workspace install-argocd ENVIRONMENT={env}/generated_files"
     on_failure: fail
     required: true
     timeout: 3600

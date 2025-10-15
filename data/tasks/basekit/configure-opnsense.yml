@@ -5,7 +5,7 @@
   vars:
     env_name: "{{ env_name | mandatory }}"
     template_file: "/install/data/templates/opnsense/config_template.xml"
-    output_dir: "/install/usr_home/{{ env_name }}/generated_files"
+    output_dir: "/docker-workspace/config/{{ env_name }}/generated_files"
     output_file: "{{ output_dir }}/config.xml"
     wan_ip: "{{ hostvars['opnsense'].wan_ip }}"
     opnsense_hostname: "opnsense"
@@ -13,7 +13,7 @@
     lan_interface: "vtnet0"
     opt1_interface: "vtnet2"
   #vars_files:
-  #  - "/install/usr_home/{{ env_name }}/group_vars/vms.yml"
+  #  - "/docker-workspace/confg/{{ env_name }}/group_vars/vms.yml"
   
   tasks:
     

@@ -142,7 +142,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace ansible-deploy-rke2-cluster ENVIRONMENT={{ clusters.mcm }}"
+    command: "make -C /docker-workspace ansible-deploy-rke2-cluster ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -152,7 +152,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace bootstrap-container-images-run ENVIRONMENT={{ clusters.mcm }}"
+    command: "make -C /docker-workspace bootstrap-container-images-run ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -162,7 +162,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={{ clusters.mcm }}"
+    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -172,7 +172,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace load-darksite-bundles ENVIRONMENT={{ clusters.mcm }}"
+    command: "make -C /docker-workspace load-darksite-bundles ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -182,7 +182,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={{ clusters.mcm }}"
+    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -192,7 +192,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace terraform-rancher-bootstrap-apply ENVIRONMENT={{ clusters.mcm }}"
+    command: "make -C /docker-workspace terraform-rancher-bootstrap-apply ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 1800
@@ -202,7 +202,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace install-gitea ENVIRONMENT={{ clusters.mcm }}"
+    command: "make -C /docker-workspace install-gitea ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -212,7 +212,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace install-argocd ENVIRONMENT={{ clusters.mcm }}"
+    command: "make -C /docker-workspace install-argocd ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600

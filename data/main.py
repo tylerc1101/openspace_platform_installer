@@ -20,7 +20,7 @@ import yaml
 # Where everything lives
 BASE_DIR = Path("/install")
 DATA_DIR = BASE_DIR / "data"
-ENV_DIR = BASE_DIR / "usr_home"
+ENV_DIR = Path("/docker-workspace/config")
 IMAGES_DIR = BASE_DIR / "images"
 LOG_DIR = BASE_DIR / "logs"
 STATE_FILE = LOG_DIR / "state.json"

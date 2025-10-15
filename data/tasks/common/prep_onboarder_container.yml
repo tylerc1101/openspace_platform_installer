@@ -6,6 +6,7 @@
     cluster_dir: "{{ config_dir }}/{{ env_name }}"
     sample_vsphere_dir: "{{ config_dir }}/sample-vsphere"
     cache_dir: "{{ cluster_dir }}/.cache"
+    ssh_user: "{{ hostvars['mcm'].ansible_user }}"
   
   tasks:
     # a) Build directories
@@ -37,6 +38,17 @@
         group: root
         mode: '0644'
 
+    - name: Modify common Makefile inside container
+      lineinfile:
+        path: "{{ common_dir }}/Makefile"
+        regexp: "{{ item.regexp }}"
+        line: "{{ item.replacement }}"
+        backrefs: yes
+      loop:
+        - { regexp: '^(SSH_USERNAME\s*\?=).*',      replacement: '\1 {{ ssh_user }}' }
+        - { regexp: '^(SSH_KEY_FILE_NAME\s*\?=).*', replacement: '\1 rancher_ssh_key' }
+        - { regexp: '^(VM_NIC_INTERFACE\s*\?=).*',  replacement: '\1 enp1s0' }
+
     # c) Create terraform state file
     - name: Create vm-terraform.tfstate inside container
       template:
@@ -49,7 +61,7 @@
     # d) Copy SSH Key into cache dir
     - name: Copy ssh_key into .cache directory
       copy:
-        src: "/install/usr_home/{{ env_name }}/.ssh/rancher_ssh_key.pub"
+        src: "/install/usr_home/{{ env_name }}/.ssh/rancher_ssh_key"
         dest: "{{ cache_dir }}/rancher_ssh_key"
         owner: root
         group: root

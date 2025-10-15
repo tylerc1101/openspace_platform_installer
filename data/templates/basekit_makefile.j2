@@ -12,14 +12,6 @@ RKE2_API_DNS            = api-mcm.{{ domain_name }}
 WILDCARD_INGRESS_VIP    = {{ vips.mcm_wildcard }}
 WILDCARD_INGRESS_DNS    = mcm.{{ domain_name }}
 
-# VM NIC
-
-VM_NIC_INTERFACE        = enp1s0
-
-
-SSH_USERNAME                ?= {{ hostvars['mcm'].ansible_user }}
-SSH_KEY_FILE_NAME           ?= rancher_ssh_key
-
 ####################################################################################
 # 1-NODE CONFIGURATION
 ####################################################################################

@@ -6,8 +6,7 @@
     cluster_dir: "{{ config_dir }}/{{ clusters.mcm }}"
     sample_vsphere_dir: "{{ config_dir }}/sample-vsphere"
     cache_dir: "{{ cluster_dir }}/.cache"
-  vars_files:
-    - "/install/usr_home/{{ env_name }}/group_vars/vms.yml"
+  
   tasks:
     # a) Build directories
     - name: Check if "{{ cluster_dir }}" directory exists inside container

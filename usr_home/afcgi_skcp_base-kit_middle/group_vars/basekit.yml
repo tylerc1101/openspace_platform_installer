@@ -10,6 +10,15 @@ onboarder: "onboarder-full.v3.5.0-rc7.tar.gz"
 basekit: "base-kit-1.0.1"
 osms: "openspace-1.9.0-295.os-app"
 
+# Virtual IP addresses
+vips:
+  osdc: "{{ mgmt_network.network }}.249"
+  osms: "{{ mgmt_network.network }}.250"
+  api_osdc: "{{ mgmt_network.network }}.251"
+  api_osms: "{{ mgmt_network.network }}.252"
+  api_mcm: "{{ mgmt_network.network }}.253"
+  mcm_wildcard: "{{ mgmt_network.network }}.254"
+
 # Optional: Override specific steps behavior
 step_overrides:
   # You can disable specific steps

@@ -11,15 +11,6 @@ opnsense_cfg:
   
   # WAN IP (can be overridden in host_vars)
   wan_ip: "{{ hostvars['opnsense'].wan_ip }}"
-  
-  # Virtual IP addresses
-  vips:
-    osdc: "{{ mgmt_network.network }}.249"
-    osms: "{{ mgmt_network.network }}.250"
-    api_osdc: "{{ mgmt_network.network }}.251"
-    api_osms: "{{ mgmt_network.network }}.252"
-    api_mcm: "{{ mgmt_network.network }}.253"
-    mcm_wildcard: "{{ mgmt_network.network }}.254"
 
   # Port forwarding rules
   port_forwards:

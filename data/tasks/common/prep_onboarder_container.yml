@@ -3,7 +3,7 @@
   vars:
     env_name: "{{ env_name | mandatory }}"
     config_dir: "/docker-workspace/config"
-    cluster_dir: "{{ config_dir }}/{{ env_name }}"
+    cluster_dir: "{{ config_dir }}/{{ env_name }}/generated_files"
     sample_vsphere_dir: "{{ config_dir }}/sample-vsphere"
     cache_dir: "{{ cluster_dir }}/.cache"
     ssh_user: "{{ hostvars['mcm'].ansible_user }}"

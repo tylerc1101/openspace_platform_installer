@@ -137,6 +137,16 @@ steps:
     on_failure: fail
     required: true
 
+  - id: pause_for_drive_partitioning
+    description: "Pause for Drive Partitioning"
+    hosts: 
+      - localhost
+    kind: command
+    command: "echo \"Complete drive partitioning\"; read -p \"Ready to continue? Y/N: \" ans; [[ \"$ans\" =~ ^[Yy]$ ]] || exit 1"
+    on_failure: fail
+    required: true
+    timeout: 3600
+
   - id: deploy_rke2_cluster
     description: "Deploy RKE2 Cluster"
     hosts: 

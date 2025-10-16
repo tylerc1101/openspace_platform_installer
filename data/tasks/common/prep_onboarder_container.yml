@@ -11,17 +11,6 @@
   
   tasks:
     # a) Build directories
-    - name: Check if "{{ cluster_dir }}" directory exists inside container
-      stat:
-        path: "{{ cluster_dir }}"
-      register: target_dir
-
-    - name: Copy sample config if missing
-      copy:
-        src: "{{ sample_vsphere_dir }}/"
-        dest: "{{ cluster_dir }}"
-      when: not target_dir.stat.exists
-
     - name: Ensure .cache directory exists
       file:
         path: "{{ cache_dir }}"

@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 """
 OpenSpace Onboarder Runner
@@ -19,11 +18,11 @@ import yaml
 # Paths
 SCRIPT_DIR = Path(__file__).parent.resolve()
 DATA_DIR = SCRIPT_DIR / "data"
-USR_HOME_DIR = SCRIPT_DIR / "usr_home"
+ENVIRONMENTS_DIR = SCRIPT_DIR / "environments"
 IMAGES_DIR = SCRIPT_DIR / "images"
 
-# Known profile types
-KNOWN_PROFILES = ["basekit", "baremetal", "aws"]
+# Known deployment types
+KNOWN_DEPLOYMENT_TYPES = ["basekit", "baremetal", "aws"]
 
 
 class Colors:
@@ -74,14 +73,14 @@ def load_yaml_file(file_path: Path) -> dict:
 
 def get_available_environments() -> List[str]:
     """Get list of available environment directories."""
-    if not USR_HOME_DIR.exists():
-        die(f"usr_home directory not found: {USR_HOME_DIR}")
+    if not ENVIRONMENTS_DIR.exists():
+        die(f"environments directory not found: {ENVIRONMENTS_DIR}")
     
     # Exclude sample directories and hidden directories
     exclude = {'sample_aws', 'sample_baremetal', 'sample_basekit'}
     
     envs = []
-    for item in USR_HOME_DIR.iterdir():
+    for item in ENVIRONMENTS_DIR.iterdir():
         if item.is_dir() and not item.name.startswith('.') and item.name not in exclude:
             envs.append(item.name)
     
@@ -99,7 +98,7 @@ def select_environment_interactive() -> str:
             import create_environment
             sys.exit(create_environment.main())
         else:
-            die(f"No environment directories found in {USR_HOME_DIR}")
+            die(f"No environment directories found in {ENVIRONMENTS_DIR}")
     
     print("Select environment:")
     for idx, env in enumerate(envs, 1):
@@ -125,47 +124,55 @@ def select_environment_interactive() -> str:
             die("Selection cancelled")
 
 
-def detect_profile_kind(env_dir: Path) -> str:
+def detect_deployment_type(env_dir: Path) -> str:
     """
-    Detect the profile kind by reading group_vars files.
-    Returns the profile kind (basekit, baremetal, or aws).
+    Detect the deployment type by reading group_vars/deployment.yml.
+    Returns the deployment type (basekit, baremetal, or aws).
     """
     group_vars_dir = env_dir / "group_vars"
     
     if not group_vars_dir.exists():
         die(f"Missing group_vars directory: {group_vars_dir}")
     
-    # Try each known profile type
-    for kind in KNOWN_PROFILES:
-        group_vars_file = group_vars_dir / f"{kind}.yml"
-        
-        if group_vars_file.exists():
-            try:
-                data = load_yaml_file(group_vars_file)
-                declared_kind = data.get('profile_kind', '')
-                
-                if declared_kind == kind:
-                    return kind
-                else:
-                    print_warning(
-                        f"{group_vars_file.name} exists but declares profile_kind='{declared_kind}' "
-                        f"(expected '{kind}')"
-                    )
-            except Exception as e:
-                print_warning(f"Could not parse {group_vars_file}: {e}")
+    # Look for deployment.yml
+    deployment_file = group_vars_dir / "deployment.yml"
     
-    # If we get here, no valid profile was found
-    die(f"""Could not determine profile kind from {group_vars_dir}
+    if not deployment_file.exists():
+        die(f"""Deployment configuration file not found: {deployment_file}
 
-Expected one of:
-  - group_vars/basekit.yml with 'profile_kind: basekit'
-  - group_vars/baremetal.yml with 'profile_kind: baremetal'
-  - group_vars/aws.yml with 'profile_kind: aws'
+Expected: {deployment_file}
+
+This file should contain:
+  deployment_type: basekit    # or baremetal, or aws
+  deployment_plan: default     # or custom, minimal, etc.
+  onboarder: "onboarder-full.v3.5.0-rc7.tar.gz"
 
 Debug:
   ls {group_vars_dir}
-  grep profile_kind {group_vars_dir}/*.yml
 """)
+    
+    try:
+        data = load_yaml_file(deployment_file)
+        deployment_type = data.get('deployment_type', '')
+        
+        if not deployment_type:
+            die(f"""Missing 'deployment_type' in {deployment_file}
+
+The file must contain:
+  deployment_type: basekit    # or baremetal, or aws
+  deployment_plan: default
+""")
+        
+        if deployment_type not in KNOWN_DEPLOYMENT_TYPES:
+            die(f"""Invalid deployment_type '{deployment_type}' in {deployment_file}
+
+Must be one of: {', '.join(KNOWN_DEPLOYMENT_TYPES)}
+""")
+        
+        return deployment_type
+        
+    except Exception as e:
+        die(f"Failed to load {deployment_file}: {e}")
 
 
 def detect_container_runtime() -> Tuple[str, str]:
@@ -277,7 +284,7 @@ def run_onboarder_container(
     env_name: str,
     env_dir: Path,
     log_dir: Path,
-    profile_kind: str,
+    deployment_type: str,
     validate_only: bool = False,
     resume: bool = False,
     verbose: bool = False
@@ -299,7 +306,7 @@ def run_onboarder_container(
     cmd_args = [
         "python3", "/install/data/main.py",
         "--env", env_name,
-        "--profile", profile_kind
+        "--deployment", deployment_type
     ]
     
     if validate_only:
@@ -314,16 +321,16 @@ def run_onboarder_container(
     print("=" * 60)
     print(f"{Colors.BOLD}Running Onboarder{Colors.ENDC}")
     print("=" * 60)
-    print(f"Environment:  {env_name}")
-    print(f"Profile:      {profile_kind}")
+    print(f"Environment:      {env_name}")
+    print(f"Deployment Type:  {deployment_type}")
     if validate_only:
-        print(f"Mode:         {Colors.YELLOW}VALIDATE ONLY{Colors.ENDC}")
+        print(f"Mode:             {Colors.YELLOW}VALIDATE ONLY{Colors.ENDC}")
     if resume:
-        print(f"Resume:       Yes")
+        print(f"Resume:           Yes")
     if verbose:
-        print(f"Verbose:      Yes")
-    print(f"Logs:         {log_dir}")
-    print(f"Runtime:      {runtime}")
+        print(f"Verbose:          Yes")
+    print(f"Logs:             {log_dir}")
+    print(f"Runtime:          {runtime}")
     print("=" * 60)
     print()
     
@@ -334,7 +341,7 @@ def run_onboarder_container(
         "-u", f"{uid}:{gid}",
         "-v", f"{DATA_DIR}:/install/data:{selinux_opt}",
         "-v", f"{IMAGES_DIR}:/install/images:{selinux_opt}",
-        "-v", f"{env_dir}:/docker-workspace/config/{env_name}:{selinux_opt}",
+        "-v", f"{env_dir}:/install/environments/{env_name}:{selinux_opt}",
         "-v", f"{log_dir}:/install/logs:{selinux_opt}",
         "-w", "/install",
         image_ref
@@ -401,7 +408,7 @@ Examples:
     # Get environment name
     if args.env:
         env_name = args.env
-        env_dir = USR_HOME_DIR / env_name
+        env_dir = ENVIRONMENTS_DIR / env_name
         
         if not env_dir.exists():
             die(f"Environment directory not found: {env_dir}")
@@ -411,22 +418,22 @@ Examples:
             die("No environment specified. Use --env=<name> or run interactively")
         
         env_name = select_environment_interactive()
-        env_dir = USR_HOME_DIR / env_name
+        env_dir = ENVIRONMENTS_DIR / env_name
     
     print_success(f"Selected environment: {env_name}")
     
-    # Detect profile kind
-    profile_kind = detect_profile_kind(env_dir)
-    print_info(f"Profile kind: {profile_kind}")
+    # Detect deployment type
+    deployment_type = detect_deployment_type(env_dir)
+    print_info(f"Deployment type: {deployment_type}")
     
     # Verify required files
     inventory_file = env_dir / "config.yml"
     if not inventory_file.exists():
         die(f"Missing config.yml: {inventory_file}")
     
-    group_vars_file = env_dir / "group_vars" / f"{profile_kind}.yml"
+    group_vars_file = env_dir / "group_vars" / "deployment.yml"
     if not group_vars_file.exists():
-        die(f"Missing group vars: {group_vars_file}")
+        die(f"Missing deployment configuration: {group_vars_file}")
     
     # Detect container runtime
     runtime, selinux_opt = detect_container_runtime()
@@ -450,7 +457,7 @@ Examples:
         env_name=env_name,
         env_dir=env_dir,
         log_dir=log_dir,
-        profile_kind=profile_kind,
+        deployment_type=deployment_type,
         validate_only=args.validate_only,
         resume=args.resume,
         verbose=args.verbose

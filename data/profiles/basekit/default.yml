@@ -1,12 +1,12 @@
-# Base-Kit Default Profile
-# This profile deploys a management KVM server and creates VMs for OpenSpace infrastructure
-# All configuration comes from usr_home/{env}/group_vars/
+# Base-Kit Default Deployment
+# This deployment deploys a management KVM server and creates VMs for OpenSpace infrastructure
+# All configuration comes from environments/{env}/group_vars/
 
 metadata:
   name: "Base-Kit Default"
   version: "1.0.0"
   description: "Deploys management KVM server with MCM, OSMS, and OPNsense VMs"
-  profile_kind: basekit
+  deployment_type: basekit
   
 requirements:
   # Inventory must have these host groups
@@ -137,16 +137,6 @@ steps:
     on_failure: fail
     required: true
 
-  - id: pause_for_drive_partitioning
-    description: "Pause for Drive Partitioning"
-    hosts: 
-      - localhost
-    kind: command
-    command: "echo \"Complete drive partitioning\"; read -p \"Ready to continue? Y/N: \" ans; [[ \"$ans\" =~ ^[Yy]$ ]] || exit 1"
-    on_failure: fail
-    required: true
-    timeout: 3600
-
   - id: deploy_rke2_cluster
     description: "Deploy RKE2 Cluster"
     hosts: 
@@ -227,12 +217,24 @@ steps:
     required: true
     timeout: 3600
 
-  - id: pause_for_gitea_patching
-    description: "Pause for Gitea Patching"
+  - id: deploy_clusters
+    description: "Deploy OpenSpace Clusters"
+    hosts:
+      - localhost
+    kind: ansible
+    file: "tasks/common/deploy_clusters.yml"
+    args:
+      - "-e env_name={env}"
+    on_failure: fail
+    required: true
+    timeout: 3600
+
+  - id: deploy_opscenter
+    description: "Deploy OpsCenter to the OSMS cluster"
     hosts: 
       - localhost
     kind: command
-    command: "echo \"Complete gitea patching\"; read -p \"Ready to continue? Y/N: \" ans; [[ \"$ans\" =~ ^[Yy]$ ]] || exit 1"
+    command: ""
     on_failure: fail
     required: true
     timeout: 3600

@@ -1,0 +1,81 @@
+---
+- name: Setup OSMS VM with certificate and Rancher secret
+  hosts: osms_vm
+  become: yes
+  vars:
+    cert_dest_path: /etc/pki/ca-trust/source/anchors/cacerts.pem
+    cert_content: |
+      -----BEGIN CERTIFICATE-----
+      MIIDyzCCArOgAwIBAgIUT1Lx....your_certificate_here....=
+      -----END CERTIFICATE-----
+    ssh_key_path: /var/lib/libvirt/config/vm_config/osms/osms_ssh_key
+    rancher_secret_name: osms-ssh
+    rancher_namespace: openspace-system
+
+  tasks:
+
+    - name: Ensure certificate directory exists
+      ansible.builtin.file:
+        path: "{{ cert_dest_path | dirname }}"
+        state: directory
+        mode: '0755'
+
+    - name: Deploy OSMS CA certificate
+      ansible.builtin.copy:
+        content: "{{ cert_content }}"
+        dest: "{{ cert_dest_path }}"
+        mode: '0644'
+
+    - name: Update CA trust store
+      ansible.builtin.command:
+        cmd: update-ca-trust extract
+      changed_when: false
+
+    - name: Fetch SSH key from hypervisor
+      delegate_to: localhost
+      become: yes
+      ansible.builtin.slurp:
+        src: "{{ ssh_key_path }}"
+      register: ssh_key_data
+
+    - name: Decode SSH key
+      set_fact:
+        ssh_key_decoded: "{{ ssh_key_data.content | b64decode }}"
+
+    - name: Create Rancher secret for OSMS SSH
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{ rancher_secret_name }}"
+            namespace: "{{ rancher_namespace }}"
+          type: Opaque
+          data:
+            username: "{{ 'openspace' | b64encode }}"
+            sshKey: "{{ ssh_key_decoded | b64encode }}"
+      delegate_to: localhost
+
+    - name: Apply OSMS Cluster manifest
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: openspace.kratos.us/v1alpha2
+          kind: OpenspaceManagementSystem
+          metadata:
+            name: openspace-osms
+            namespace: "{{ rancher_namespace }}"
+          spec:
+            k8sDistro: v1.27.15+rke2r1
+            type: ssh
+            vipAddress: 192.168.2.250
+            vipDNS: osms.base-kit.kratos
+            sshSpecs:
+              sshServers:
+              - name: osms
+                ipAddress: 192.168.2.9
+                secretRef:
+                  name: "{{ rancher_secret_name }}"
+                  namespace: "{{ rancher_namespace }}"
+      delegate_to: localhost

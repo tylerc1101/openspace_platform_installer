@@ -1,7 +1,7 @@
 # inventory.yml
 all:
   children:
-    basekit:
+    deployment:
       hosts:
         localhost:
           ansible_connection: local
@@ -21,12 +21,7 @@ all:
 
         ntp:
           server: "192.168.2.100"
-
-        clusters:
-          mcm: "mcm-cluster"
-          osms: "osms-cluster"
-          osdc: "osdc-cluster"
-
+          
       children:
         mgmt_svr:
           hosts:

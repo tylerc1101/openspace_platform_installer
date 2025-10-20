@@ -2,7 +2,7 @@
 """
 Simple Installer Runner
 -----------------------
-Runs installation steps from a profile YAML file.
+Runs installation steps from a deployment YAML file.
 Each step can be an Ansible playbook or a direct command.
 """
 
@@ -20,7 +20,7 @@ import yaml
 # Where everything lives
 BASE_DIR = Path("/install")
 DATA_DIR = BASE_DIR / "data"
-ENV_DIR = Path("/docker-workspace/config")
+ENV_DIR = BASE_DIR / "environments"
 IMAGES_DIR = BASE_DIR / "images"
 LOG_DIR = BASE_DIR / "logs"
 STATE_FILE = LOG_DIR / "state.json"
@@ -137,16 +137,16 @@ def get_host_from_inventory(inventory_file: Path, host_or_group: str) -> Dict[st
     return host_info
 
 
-def replace_placeholders(text: str, env_name: str, profile_name: str, 
-                        profile_kind: str, group_vars: Dict[str, Any]) -> str:
+def replace_placeholders(text: str, env_name: str, deployment_plan: str, 
+                        deployment_type: str, group_vars: Dict[str, Any]) -> str:
     """
     Replace placeholders in text with actual values.
-    Supports: {env}, {profile}, {profile_kind}, {variable_name}
+    Supports: {env}, {deployment}, {deployment_type}, {variable_name}
     """
     result = (text
               .replace("{env}", env_name)
-              .replace("{profile}", profile_name)
-              .replace("{profile_kind}", profile_kind))
+              .replace("{deployment}", deployment_plan)
+              .replace("{deployment_type}", deployment_type))
     
     # Replace any group_vars variables
     for key, value in group_vars.items():
@@ -159,15 +159,15 @@ def replace_placeholders(text: str, env_name: str, profile_name: str,
 def find_step_file(file_path: str) -> Path:
     """
     Convert step file paths to absolute paths.
-    All paths in profiles should be relative to /install/data.
+    All paths in deployments should be relative to /install/data.
     """
     path = Path(file_path)
     
     if path.is_absolute():
-        if str(path).startswith("/docker-workspace/config/"):
+        if str(path).startswith("/install/environments/"):
             return path
         raise ValueError(
-            f"Use relative paths in profiles (relative to /install/data): {file_path}"
+            f"Use relative paths in deployments (relative to /install/data): {file_path}"
         )
     
     return DATA_DIR / path
@@ -213,7 +213,7 @@ def build_ssh_command(host_info: Dict[str, Any], remote_command: str) -> List[st
 
 def build_command(step: Dict[str, Any], step_file: Path, 
                  inventory_file: Path, rendered_args: List[str],
-                 env_name: str, profile_name: str, profile_kind: str,
+                 env_name: str, deployment_plan: str, deployment_type: str,
                  group_vars: Dict[str, Any]) -> List[str]:
     """Build the command to run based on step type."""
     kind = step.get("kind", "").lower()
@@ -227,7 +227,7 @@ def build_command(step: Dict[str, Any], step_file: Path,
         
         # Replace placeholders in command
         rendered_command = replace_placeholders(
-            command, env_name, profile_name, profile_kind, group_vars
+            command, env_name, deployment_plan, deployment_type, group_vars
         )
         
         # For command kind, we only handle single host
@@ -386,34 +386,34 @@ def install_rpms(logger: logging.Logger) -> bool:
         return False
 
 
-def validate_profile(profile_file: Path, profile_data: Dict[str, Any], 
-                     group_vars: Dict[str, Any], logger: logging.Logger) -> bool:
-    """Validate profile structure and file existence."""
+def validate_deployment(deployment_file: Path, deployment_data: Dict[str, Any], 
+                       group_vars: Dict[str, Any], logger: logging.Logger) -> bool:
+    """Validate deployment structure and file existence."""
     logger.info("=" * 60)
-    logger.info("VALIDATION: Checking profile configuration")
+    logger.info("VALIDATION: Checking deployment configuration")
     logger.info("=" * 60)
     
     errors = []
     
-    if "steps" not in profile_data:
-        errors.append(f"Profile must have 'steps' key: {profile_file}")
+    if "steps" not in deployment_data:
+        errors.append(f"Deployment must have 'steps' key: {deployment_file}")
         return False
     
-    steps = profile_data.get("steps", [])
+    steps = deployment_data.get("steps", [])
     if not isinstance(steps, list):
-        errors.append(f"'steps' must be a list: {profile_file}")
+        errors.append(f"'steps' must be a list: {deployment_file}")
         return False
     
     if not steps:
-        errors.append(f"Profile has no steps defined: {profile_file}")
+        errors.append(f"Deployment has no steps defined: {deployment_file}")
         return False
     
-    logger.info(f"✓ Profile has {len(steps)} steps")
+    logger.info(f"✓ Deployment has {len(steps)} steps")
     
     # Validate metadata if present
-    metadata = profile_data.get("metadata", {})
+    metadata = deployment_data.get("metadata", {})
     if metadata:
-        logger.info(f"✓ Profile: {metadata.get('name', 'Unknown')}")
+        logger.info(f"✓ Deployment: {metadata.get('name', 'Unknown')}")
         logger.info(f"  Version: {metadata.get('version', 'Unknown')}")
         logger.info(f"  Description: {metadata.get('description', 'N/A')}")
     
@@ -462,12 +462,12 @@ def validate_profile(profile_file: Path, profile_data: Dict[str, Any],
             logger.info(f"    Hosts: {step.get('hosts')}")
     
     if errors:
-        logger.error("\n❌ PROFILE VALIDATION FAILED:")
+        logger.error("\n❌ DEPLOYMENT VALIDATION FAILED:")
         for error in errors:
             logger.error(f"  - {error}")
         return False
     
-    logger.info("\n✅ Profile validation passed!")
+    logger.info("\n✅ Deployment validation passed!")
     logger.info("=" * 60)
     return True
 
@@ -476,14 +476,14 @@ def main():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Run installation steps")
     parser.add_argument("--env", required=True, help="Environment name")
-    parser.add_argument("--profile", required=True, help="Profile type (basekit/baremetal/aws)")
+    parser.add_argument("--deployment", required=True, help="Deployment type (basekit/baremetal/aws)")
     parser.add_argument("--resume", action="store_true", help="Skip already completed steps")
     parser.add_argument("--validate-only", action="store_true", help="Only validate, don't run")
     parser.add_argument("--verbose", "-v", action="store_true", help="Verbose logging")
     cli_args = parser.parse_args()
 
     env_name = cli_args.env
-    profile_kind = cli_args.profile
+    deployment_type = cli_args.deployment
 
     # Setup logging
     logger = setup_logging(LOG_DIR, cli_args.verbose)
@@ -491,57 +491,58 @@ def main():
     logger.info("OpenSpace Onboarder Starting")
     logger.info("=" * 60)
     logger.info(f"Environment: {env_name}")
-    logger.info(f"Profile: {profile_kind}")
+    logger.info(f"Deployment Type: {deployment_type}")
     logger.info(f"Resume mode: {cli_args.resume}")
     logger.info("=" * 60)
 
     # Find config files
     env_path = ENV_DIR / env_name
     inventory_file = env_path / "config.yml"
-    group_vars_file = env_path / "group_vars" / f"{profile_kind}.yml"
+    group_vars_file = env_path / "group_vars" / "deployment.yml"
 
     if not inventory_file.exists():
         logger.error(f"Config file not found: {inventory_file}")
         return EXIT_CONFIG_ERROR
     
     if not group_vars_file.exists():
-        logger.error(f"Group vars file not found: {group_vars_file}")
+        logger.error(f"Deployment configuration file not found: {group_vars_file}")
+        logger.error(f"Expected: group_vars/deployment.yml")
         return EXIT_CONFIG_ERROR
 
-    # Load the profile name from group_vars
+    # Load the deployment plan from group_vars
     try:
         group_vars = load_yaml_file(group_vars_file)
     except Exception as e:
         logger.error(f"Failed to load group vars: {e}")
         return EXIT_CONFIG_ERROR
     
-    if "profile_kind" not in group_vars:
-        logger.error(f"Missing 'profile_kind' in {group_vars_file}")
+    if "deployment_type" not in group_vars:
+        logger.error(f"Missing 'deployment_type' in {group_vars_file}")
         return EXIT_CONFIG_ERROR
     
-    if "profile_name" not in group_vars:
-        logger.error(f"Missing 'profile_name' in {group_vars_file}")
+    if "deployment_plan" not in group_vars:
+        logger.error(f"Missing 'deployment_plan' in {group_vars_file}")
         return EXIT_CONFIG_ERROR
     
-    profile_name = group_vars["profile_name"]
+    deployment_plan = group_vars["deployment_plan"]
     
-    # Find the profile file
-    profile_file = DATA_DIR / "profiles" / profile_kind / f"{profile_name}.yml"
-    if not profile_file.exists():
-        logger.error(f"Profile file not found: {profile_file}")
+    # Find the deployment file
+    deployment_file = DATA_DIR / "deployments" / deployment_type / f"{deployment_plan}.yml"
+    if not deployment_file.exists():
+        logger.error(f"Deployment file not found: {deployment_file}")
         return EXIT_CONFIG_ERROR
 
-    logger.info(f"Using profile file: {profile_file}")
+    logger.info(f"Using deployment file: {deployment_file}")
 
-    # Load the steps from the profile
+    # Load the steps from the deployment
     try:
-        profile_data = load_yaml_file(profile_file)
+        deployment_data = load_yaml_file(deployment_file)
     except Exception as e:
-        logger.error(f"Failed to load profile: {e}")
+        logger.error(f"Failed to load deployment: {e}")
         return EXIT_CONFIG_ERROR
     
-    # Validate profile structure
-    if not validate_profile(profile_file, profile_data, group_vars, logger):
+    # Validate deployment structure
+    if not validate_deployment(deployment_file, deployment_data, group_vars, logger):
         return EXIT_VALIDATION_FAILED
     
     # If validate-only mode, stop here
@@ -554,18 +555,18 @@ def main():
         logger.error("Failed to install required RPMs")
         return EXIT_CONFIG_ERROR
     
-    # Extract steps from profile
-    steps = profile_data.get("steps", [])
+    # Extract steps from deployment
+    steps = deployment_data.get("steps", [])
     
     if not steps:
-        logger.error("No steps found in profile")
+        logger.error("No steps found in deployment")
         return EXIT_CONFIG_ERROR
 
     # Load or initialize state tracking
     state = load_state()
     state["env"] = env_name
-    state["profile_kind"] = profile_kind
-    state["profile_name"] = profile_name
+    state["deployment_type"] = deployment_type
+    state["deployment_plan"] = deployment_plan
     
     if "steps" not in state:
         state["steps"] = {}
@@ -659,14 +660,14 @@ def main():
                 # Replace placeholders in arguments
                 step_args = step_for_exec.get("args") or []
                 rendered_args = [
-                    replace_placeholders(arg, env_name, profile_name, profile_kind, group_vars)
+                    replace_placeholders(arg, env_name, deployment_plan, deployment_type, group_vars)
                     for arg in step_args
                 ]
 
             # Build the command
             try:
                 command = build_command(step_for_exec, step_file, inventory_file, rendered_args,
-                                       env_name, profile_name, profile_kind, group_vars)
+                                       env_name, deployment_plan, deployment_type, group_vars)
             except ValueError as e:
                 logger.error(f"[{step_id}] ERROR: {e}")
                 state["steps"][step_id] = {"status": "failed", "error": str(e)}

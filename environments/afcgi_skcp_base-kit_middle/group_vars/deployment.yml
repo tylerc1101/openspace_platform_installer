@@ -2,13 +2,25 @@
 # All configuration for this environment's basekit deployment
 
 # Profile configuration
-profile_kind: "basekit"      # Which profile type: basekit, baremetal, aws
-profile_name: "default"      # Which profile to use: default, minimal, custom, etc.
+deployment_type: "basekit"                 # Which deployment type: basekit, baremetal, aws
+deployment_plan: "federal_default"         # Which deployment plan to use: default, minimal, custom, etc.
 
 # Image references (used by profile requirements validation)
 onboarder: "onboarder-full.v3.5.0-rc7.tar.gz"
 basekit: "base-kit-1.0.1"
 osms: "openspace-1.9.0-295.os-app"
+
+infrastructure_cluster:
+  cluster_name: "mcm"
+  hosts: "{{ groups['mcm'] | default([]) }}"
+
+deployed_clusters:
+  openspace_management:
+    cluster_name: "osms"
+    hosts: "{{ groups['osms'] | default([]) }}"
+  openspace_data:
+    cluster_name: "osdc"
+    hosts: "{{ groups['osdc'] | default([]) }}"
 
 # Virtual IP addresses
 vips:

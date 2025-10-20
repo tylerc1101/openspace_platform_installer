@@ -11,17 +11,17 @@ import sys
 from pathlib import Path
 
 # Import our modules - FIXED PATHS
-from data.lib import (
+from lib import (
     EXIT_SUCCESS, EXIT_CONFIG_ERROR, EXIT_FILE_NOT_FOUND,
     EXIT_UNSUPPORTED_KIND, EXIT_STEP_FAILED, EXIT_VALIDATION_FAILED
 )
-from data.lib.config import setup_logging, load_yaml_file
-from data.lib.context import ExecutionContext
-from data.lib.exceptions import DeploymentError, ConfigurationError, ValidationError
-from data.lib.installer import install_rpms
-from data.lib.state import StateManager
-from data.lib.step_executor import StepExecutor
-from data.lib.validator import validate_deployment
+from lib.config import setup_logging, load_yaml_file
+from lib.context import ExecutionContext
+from lib.exceptions import DeploymentError, ConfigurationError, ValidationError
+from lib.installer import install_rpms
+from lib.state import StateManager
+from lib.step_executor import StepExecutor
+from ib.validator import validate_deployment
 
 
 # Where everything lives

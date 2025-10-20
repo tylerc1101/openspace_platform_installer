@@ -21,7 +21,7 @@ from lib.exceptions import DeploymentError, ConfigurationError, ValidationError
 from lib.installer import install_rpms
 from lib.state import StateManager
 from lib.step_executor import StepExecutor
-from ib.validator import validate_deployment
+from lib.validator import validate_deployment
 
 
 # Where everything lives

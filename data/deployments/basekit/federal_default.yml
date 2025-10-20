@@ -229,14 +229,14 @@ steps:
     required: true
     timeout: 3600
 
-  - id: deploy_opscenter
-    description: "Deploy OpsCenter to the OSMS cluster"
-    hosts: 
-      - localhost
-    kind: command
-    command: ""
-    on_failure: fail
-    required: true
-    timeout: 3600
+  #- id: deploy_opscenter
+  #  description: "Deploy OpsCenter to the OSMS cluster"
+  #  hosts: 
+  #    - localhost
+  #  kind: command
+  #  command: ""
+  #  on_failure: fail
+  #  required: true
+  #  timeout: 3600
 
 #  - id: Kratos Power Scripts (step 15 in instructions)

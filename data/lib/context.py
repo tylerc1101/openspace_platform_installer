@@ -17,7 +17,7 @@ class ExecutionContext:
     # Directory paths
     base_dir: Path = Path("/install")
     data_dir: Path = Path("/install/data")
-    env_dir: Path = Path("/install/environments")
+    env_dir: Path = Path("/docker-workspace/config")
     images_dir: Path = Path("/install/images")
     log_dir: Path = Path("/install/logs")
     

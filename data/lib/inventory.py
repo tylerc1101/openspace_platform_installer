@@ -117,7 +117,7 @@ def find_step_file(file_path: str, data_dir: Path) -> Path:
     path = Path(file_path)
     
     if path.is_absolute():
-        if str(path).startswith("/install/environments/"):
+        if str(path).startswith("/docker-workspace/config/"):
             return path
         raise InventoryError(
             f"Use relative paths in deployments (relative to {data_dir}): {file_path}"

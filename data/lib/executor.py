@@ -9,11 +9,28 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional
 
 from .config import replace_placeholders
+from .context import ExecutionContext
+from .exceptions import ExecutionError
 from .inventory import get_host_from_inventory
 
 
 def build_ssh_command(host_info: Dict[str, Any], remote_command: str) -> List[str]:
-    """Build SSH command to execute remote command with real-time output."""
+    """
+    Build SSH command to execute remote command with real-time output.
+    
+    Args:
+        host_info: Host connection information from inventory
+        remote_command: Command to execute remotely
+        
+    Returns:
+        List of command arguments for subprocess
+        
+    Example:
+        >>> cmd = build_ssh_command(
+        ...     {'ansible_host': '10.0.0.1', 'ansible_user': 'root'},
+        ...     'ls -la /tmp'
+        ... )
+    """
     ssh_cmd = []
     
     # Use sshpass if password is provided
@@ -50,11 +67,35 @@ def build_ssh_command(host_info: Dict[str, Any], remote_command: str) -> List[st
     return ssh_cmd
 
 
-def build_command(step: Dict[str, Any], step_file: Path, 
-                 inventory_file: Path, rendered_args: List[str],
-                 env_name: str, deployment_plan: str, deployment_type: str,
-                 group_vars: Dict[str, Any]) -> List[str]:
-    """Build the command to run based on step type."""
+def build_command(
+    step: Dict[str, Any], 
+    step_file: Optional[Path],
+    ctx: ExecutionContext,
+    rendered_args: List[str]
+) -> List[str]:
+    """
+    Build the command to run based on step type.
+    
+    Args:
+        step: Step configuration dictionary
+        step_file: Path to step file (for ansible/python/bash)
+        ctx: Execution context
+        rendered_args: Already-rendered command arguments
+        
+    Returns:
+        List of command arguments for subprocess
+        
+    Raises:
+        ExecutionError: If command cannot be built
+        
+    Example:
+        >>> cmd = build_command(
+        ...     {'kind': 'ansible', 'file': 'setup.yml'},
+        ...     Path('/install/data/tasks/setup.yml'),
+        ...     ctx,
+        ...     ['-v']
+        ... )
+    """
     kind = step.get("kind", "").lower()
     hosts = step.get("hosts", "localhost")
     
@@ -62,11 +103,15 @@ def build_command(step: Dict[str, Any], step_file: Path,
     if kind == "command":
         command = step.get("command")
         if not command:
-            raise ValueError("'command' kind requires 'command' field")
+            raise ExecutionError("'command' kind requires 'command' field")
         
         # Replace placeholders in command
         rendered_command = replace_placeholders(
-            command, env_name, deployment_plan, deployment_type, group_vars
+            command, 
+            ctx.env_name, 
+            ctx.deployment_plan, 
+            ctx.deployment_type, 
+            ctx.group_vars
         )
         
         # For command kind, we only handle single host
@@ -80,13 +125,13 @@ def build_command(step: Dict[str, Any], step_file: Path,
             return ["/bin/bash", "-c", rendered_command]
         else:
             # Run via SSH
-            host_info = get_host_from_inventory(inventory_file, target_host)
+            host_info = get_host_from_inventory(ctx.inventory_file, target_host, ctx.logger)
             return build_ssh_command(host_info, rendered_command)
     
     # Handle 'ansible' kind - Ansible playbooks
     elif kind == "ansible":
         # Build ansible-playbook command
-        cmd = ["ansible-playbook", "-i", str(inventory_file), str(step_file)]
+        cmd = ["ansible-playbook", "-i", str(ctx.inventory_file), str(step_file)]
         
         # Convert hosts to comma-separated string for Ansible
         if hosts and hosts != "localhost":
@@ -110,22 +155,42 @@ def build_command(step: Dict[str, Any], step_file: Path,
         return [shell, str(step_file)] + rendered_args
     
     else:
-        raise ValueError(f"Unknown step kind: {kind}")
+        raise ExecutionError(f"Unknown step kind: {kind}")
 
 
-def run_command(command: List[str], log_file: Path, log_dir: Path,
-                data_dir: Path, timeout: Optional[int] = None) -> int:
+def run_command(
+    command: List[str], 
+    log_file: Path, 
+    ctx: ExecutionContext,
+    timeout: Optional[int] = None
+) -> int:
     """
     Run a command and save output to a log file.
-    Returns the exit code (0 = success).
-    """
-    log_dir.mkdir(parents=True, exist_ok=True)
     
-    logging.info(f"Running: {' '.join(command)}")
+    Args:
+        command: Command and arguments to execute
+        log_file: Path to write command output
+        ctx: Execution context
+        timeout: Optional timeout in seconds
+        
+    Returns:
+        Exit code (0 = success)
+        
+    Example:
+        >>> exit_code = run_command(
+        ...     ['ls', '-la'],
+        ...     Path('/var/log/step.log'),
+        ...     ctx,
+        ...     timeout=300
+        ... )
+    """
+    ctx.log_dir.mkdir(parents=True, exist_ok=True)
+    
+    ctx.logger.info(f"Running: {' '.join(command)}")
     
     # Set up environment for ansible
     env = os.environ.copy()
-    env["ANSIBLE_CONFIG"] = str(data_dir / "ansible.cfg")
+    env["ANSIBLE_CONFIG"] = str(ctx.data_dir / "ansible.cfg")
     env["ANSIBLE_HOST_KEY_CHECKING"] = "False"
     env["ANSIBLE_SSH_RETRIES"] = "3"
     env["PYTHONUNBUFFERED"] = "1"
@@ -139,7 +204,7 @@ def run_command(command: List[str], log_file: Path, log_dir: Path,
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,  # Line buffered
-                cwd=str(data_dir.parent),
+                cwd=str(ctx.base_dir),
                 env=env
             )
             
@@ -153,9 +218,9 @@ def run_command(command: List[str], log_file: Path, log_dir: Path,
             return exit_code
             
     except subprocess.TimeoutExpired:
-        logging.error(f"Command timed out after {timeout} seconds")
+        ctx.logger.error(f"Command timed out after {timeout} seconds")
         process.kill()
         return 124  # Standard timeout exit code
     except Exception as e:
-        logging.error(f"Failed to run command: {e}")
+        ctx.logger.error(f"Failed to run command: {e}")
         return 1

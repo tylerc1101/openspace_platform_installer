@@ -6,13 +6,33 @@ import logging
 from pathlib import Path
 from typing import Dict, Any, List
 
+from .context import ExecutionContext
 from .inventory import find_step_file
 
 
-def validate_deployment(deployment_file: Path, deployment_data: Dict[str, Any], 
-                       group_vars: Dict[str, Any], data_dir: Path,
-                       logger: logging.Logger) -> bool:
-    """Validate deployment structure and file existence."""
+def validate_deployment(
+    deployment_file: Path, 
+    deployment_data: Dict[str, Any],
+    ctx: ExecutionContext
+) -> bool:
+    """
+    Validate deployment structure and file existence.
+    
+    Args:
+        deployment_file: Path to deployment YAML file
+        deployment_data: Parsed deployment configuration
+        ctx: Execution context
+        
+    Returns:
+        True if validation passes, False otherwise
+        
+    Example:
+        >>> if not validate_deployment(deploy_file, deploy_data, ctx):
+        ...     print("Validation failed!")
+        ...     sys.exit(1)
+    """
+    logger = ctx.logger
+    
     logger.info("=" * 60)
     logger.info("VALIDATION: Checking deployment configuration")
     logger.info("=" * 60)
@@ -73,12 +93,12 @@ def validate_deployment(deployment_file: Path, deployment_data: Dict[str, Any],
             
             # Check if file exists
             try:
-                step_file = find_step_file(file_path, data_dir)
+                step_file = find_step_file(file_path, ctx.data_dir)
                 if not step_file.exists():
                     errors.append(f"Step '{step_id}' file not found: {step_file}")
                 else:
                     logger.info(f"    ✓ File exists")
-            except ValueError as e:
+            except Exception as e:
                 errors.append(f"Step '{step_id}': {e}")
         
         # Show hosts if specified

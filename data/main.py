@@ -27,7 +27,7 @@ from lib.validator import validate_deployment
 # Where everything lives
 BASE_DIR = Path("/install")
 DATA_DIR = BASE_DIR / "data"
-ENV_DIR = BASE_DIR / "environments"
+ENV_DIR = Path("/docker-workspace/config")
 IMAGES_DIR = BASE_DIR / "images"
 LOG_DIR = BASE_DIR / "logs"
 

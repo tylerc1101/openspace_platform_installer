@@ -1,0 +1,52 @@
+- name: Setup {{ target_hosts }} for cluster deployment
+  hosts: "{{ target_hosts }}"
+  become: yes
+  vars:
+    env_dir: "/docker-workspace/config/{{ env_name }}"
+
+  tasks:
+
+    - name: Ensure certificate directory exists
+      ansible.builtin.file:
+        path: "/etc/pki/ca-trust/source/anchors/"
+        state: directory
+        mode: '0755'
+
+    - name: Deploy CA certificate
+      ansible.builtin.copy:
+        src: "{{ env_dir }}/generated_files/.cache/cacerts.pem"
+        dest: "/etc/pki/ca-trust/source/anchors/cacerts.pem"
+        mode: '0644'
+      register: cert_copy_result
+
+    - name: Update CA trust store
+      ansible.builtin.command:
+        cmd: update-ca-trust extract
+      changed_when: false
+      when: cert_copy_result.changed
+
+    - name: Fetch SSH key from hypervisor
+      delegate_to: localhost
+      ansible.builtin.slurp:
+        src: "{{ env_dir }}/.ssh/{{ cluster_ssh_key }}"
+      register: ssh_key_data
+
+    - name: Decode SSH key
+      set_fact:
+        ssh_key_decoded: "{{ ssh_key_data.content | b64decode }}"
+      delegate_to: localhost
+
+    - name: Create Rancher secret
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Secret
+          metadata:
+            name: "{{ cluster_name }}-ssh"
+            namespace: "openspace-system"
+          type: Opaque
+          data:
+            username: "{{ ansible_user | b64encode }}"
+            sshKey: "{{ ssh_key_decoded | b64encode }}"
+      delegate_to: localhost

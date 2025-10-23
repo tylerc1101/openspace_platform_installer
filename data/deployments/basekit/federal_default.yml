@@ -12,7 +12,7 @@ requirements:
   # Inventory must have these host groups
   inventory_groups:
     - mgmt_kvm
-    - vms
+    - clusters
   
   # Environment files that must exist
   files:
@@ -54,10 +54,7 @@ steps:
   - id: configure_nodes
     description: "Configure Node"
     hosts:
-      - mcm
-      - osms
-      #- osdc1
-      #- osdc2
+      - clusters
     kind: ansible
     file: "tasks/common/configure-node.yml"
     args:
@@ -69,8 +66,7 @@ steps:
   - id: install_rke2_selinux
     description: "Install RKE2 SELinux Package"
     hosts:
-      - mcm
-      - osms
+      - clusters
     kind: ansible
     file: "tasks/common/install_rke2-selinux.yml"
     args:
@@ -128,7 +124,7 @@ steps:
   - id: copy_mcm_ssh_key
     description: "Copy SSH Key to MCM"
     hosts: 
-      - mcm
+      - infrastructure_cluster
     kind: ansible
     file: "tasks/common/copy_ssh_key.yml"
     args:
@@ -217,10 +213,22 @@ steps:
     required: true
     timeout: 3600
 
+  - id: prep_cluster_nodes
+    description: "Prepare Cluster Nodes for Deployment"
+    hosts:
+      - downstream_clusters
+    kind: ansible
+    file: "tasks/common/prep_cluster_nodes.yml"
+    args:
+      - "-e env_name={env}"
+    on_failure: fail
+    required: true
+    timeout: 1800
+
   - id: deploy_clusters
     description: "Deploy OpenSpace Clusters"
     hosts:
-      - localhost
+      - downstream_clusters
     kind: ansible
     file: "tasks/common/deploy_clusters.yml"
     args:

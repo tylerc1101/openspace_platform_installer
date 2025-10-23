@@ -10,18 +10,6 @@ onboarder: "onboarder-full.v3.5.0-rc7.tar.gz"
 basekit: "base-kit-1.0.1"
 osms: "openspace-1.9.0-295.os-app"
 
-infrastructure_cluster:
-  cluster_name: "mcm"
-  hosts: "{{ groups['mcm'] | default([]) }}"
-
-deployed_clusters:
-  openspace_management:
-    cluster_name: "osms"
-    hosts: "{{ groups['osms'] | default([]) }}"
-  openspace_data:
-    cluster_name: "osdc"
-    hosts: "{{ groups['osdc'] | default([]) }}"
-
 # Virtual IP addresses
 vips:
   osdc: "{{ mgmt_network.network }}.249"

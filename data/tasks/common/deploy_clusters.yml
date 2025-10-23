@@ -1,81 +1,74 @@
 ---
-- name: Setup OSMS VM with certificate and Rancher secret
-  hosts: osms_vm
-  become: yes
+- name: Build cluster list and apply their manifests
+  hosts: "{{ target_hosts }}"
+  run_once: true
   vars:
-    cert_dest_path: /etc/pki/ca-trust/source/anchors/cacerts.pem
-    cert_content: |
-      -----BEGIN CERTIFICATE-----
-      MIIDyzCCArOgAwIBAgIUT1Lx....your_certificate_here....=
-      -----END CERTIFICATE-----
-    ssh_key_path: /var/lib/libvirt/config/vm_config/osms/osms_ssh_key
-    rancher_secret_name: osms-ssh
-    rancher_namespace: openspace-system
+    env_dir: "/docker-workspace/config/{{ env_name }}"
+    kubeconfig_path: "{{ lookup('env','KUBECONFIG') | default('/root/.kube/config', true) }}"
 
   tasks:
-
-    - name: Ensure certificate directory exists
-      ansible.builtin.file:
-        path: "{{ cert_dest_path | dirname }}"
-        state: directory
-        mode: '0755'
-
-    - name: Deploy OSMS CA certificate
-      ansible.builtin.copy:
-        content: "{{ cert_content }}"
-        dest: "{{ cert_dest_path }}"
-        mode: '0644'
-
-    - name: Update CA trust store
-      ansible.builtin.command:
-        cmd: update-ca-trust extract
-      changed_when: false
-
-    - name: Fetch SSH key from hypervisor
-      delegate_to: localhost
-      become: yes
-      ansible.builtin.slurp:
-        src: "{{ ssh_key_path }}"
-      register: ssh_key_data
-
-    - name: Decode SSH key
+    - name: Build cluster context from inventory (rep host + vars)
       set_fact:
-        ssh_key_decoded: "{{ ssh_key_data.content | b64decode }}"
+        clusters: >-
+          {{
+            (clusters | default([])) + [
+              {
+                'group': item,
+                'rep_host': (groups[item] | first),
+                'deployment_yaml': hostvars[groups[item] | first].deployment_yaml,
+                'cluster_name': hostvars[groups[item] | first].cluster_name,
+                'cluster_ssh_key': hostvars[groups[item] | first].cluster_ssh_key
+              }
+            ]
+          }}
+      loop: "{{ clusters_to_deploy }}"
+      when:
+        - groups[item] is defined
+        - (groups[item] | length) > 0
 
-    - name: Create Rancher secret for OSMS SSH
+    - name: Fail if any requested cluster group has no hosts
+      fail:
+        msg: "Requested cluster group {{ item }} has no hosts; cannot resolve its vars"
+      when: groups[item] is not defined or (groups[item] | length) == 0
+      loop: "{{ clusters_to_deploy }}"
+
+    - name: Apply manifest for each cluster
       kubernetes.core.k8s:
         state: present
-        definition:
-          apiVersion: v1
-          kind: Secret
-          metadata:
-            name: "{{ rancher_secret_name }}"
-            namespace: "{{ rancher_namespace }}"
-          type: Opaque
-          data:
-            username: "{{ 'openspace' | b64encode }}"
-            sshKey: "{{ ssh_key_decoded | b64encode }}"
+        # If your manifest is a Jinja2 template (*.j2):
+        definition: "{{ lookup('template', item.deployment_yaml) | from_yaml }}"
+        # If it's plain YAML (no Jinja), use:
+        # definition: "{{ lookup('file', item.deployment_yaml) | from_yaml }}"
+        kubeconfig: "{{ kubeconfig_path }}"
+        # context: "{{ k8s_context | default(omit) }}"
+        # apply: yes    # (optional) server-side apply
+      loop: "{{ clusters }}"
+      loop_control:
+        label: "{{ item.group }}"
       delegate_to: localhost
 
-    - name: Apply OSMS Cluster manifest
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: openspace.kratos.us/v1alpha2
-          kind: OpenspaceManagementSystem
-          metadata:
-            name: openspace-osms
-            namespace: "{{ rancher_namespace }}"
-          spec:
-            k8sDistro: v1.27.15+rke2r1
-            type: ssh
-            vipAddress: 192.168.2.250
-            vipDNS: osms.base-kit.kratos
-            sshSpecs:
-              sshServers:
-              - name: osms
-                ipAddress: 192.168.2.9
-                secretRef:
-                  name: "{{ rancher_secret_name }}"
-                  namespace: "{{ rancher_namespace }}"
+    - name: Wait for {{ item.cluster_name }} CR to be Ready
+      kubernetes.core.k8s_info:
+        api_version: openspace.kratos.us/v1alpha2
+        kind: OpenspaceManagementSystem      # use OpenspaceDataCluster for OSDC
+        name: "{{ item.cluster_name }}"
+        namespace: "{{ rancher_namespace | default('openspace-system') }}"
+      register: cr_info
+      until: >
+        cr_info.resources
+        and cr_info.resources[0].status is defined
+        and cr_info.resources[0].status.conditions is defined
+        and (
+          cr_info.resources[0].status.conditions
+          | selectattr('status','equalto','True')
+          | selectattr('type','in',['Ready','ClusterReady','Available'])
+          | list
+          | length
+        ) > 0
+      retries: 60        # ~10 minutes at 10s intervals; tune as needed
+      delay: 10
       delegate_to: localhost
+      loop: "{{ clusters }}"
+      loop_control:
+        label: "{{ item.cluster_name }}"
+

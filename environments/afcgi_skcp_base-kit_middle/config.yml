@@ -2,70 +2,154 @@
 all:
   children:
     deployment:
-      hosts:
-        localhost:
-          ansible_connection: local
       vars:
+        # ===========================================================
+        #  Basic Connection / SSH Configuration
+        # ===========================================================
+        ansible_user: "kratos"                     # Default SSH username for all hosts
+        ansible_ssh_pass: "kratos"
+        ansible_become_pass: "kratos"
+
+        # ===========================================================
+        #  Deployment Configuration - See README for details
+        # ===========================================================
+        deployment_type: "basekit"                 # Which deployment type: basekit, baremetal, aws
+        deployment_plan: "federal_default"         # Which deployment plan to use: default, minimal, custom, etc.
+
+        # ===========================================================
+        #  Image References - File names for required images
+        # ===========================================================
+        onboarder: "onboarder-full.v3.5.0-rc7.tar.gz"
+        basekit: "base-kit-1.0.1"
+        osms: "openspace-1.9.0-295.os-app"
+
+        # ===========================================================
+        #  Environment-Level Variables
+        # ===========================================================
+       
+        # Domain used across the environment (used in DNS, certs, etc.)
         domain_name: "base-kit.kratos"
 
+        # -----------------------------------------------------------
+        # Customer Network - WAN/External network info
+        # -----------------------------------------------------------
         customer_network:
           gateway: "10.243.76.1"
           cidr: "/23"
           dns_servers: ["10.243.25.50", "10.243.25.53"]
 
+        # -----------------------------------------------------------
+        # Management Network - Internal cluster communication network
+        # -----------------------------------------------------------
         mgmt_network:
           network: "192.168.2"
           cidr: "/24"
           gateway: "192.168.2.1"
           dns_servers: ["192.168.2.1"]
 
+        # -----------------------------------------------------------
+        # NTP Server - Time synchronization source
+        # -----------------------------------------------------------
         ntp:
           server: "192.168.2.100"
-          
+
+      # =============================================================
+      #  Standalone / Utility Hosts
+      # =============================================================
+      hosts:
+        # -----------------------------------------------------------
+        # localhost - Used for local Ansible execution or preflight
+        # -----------------------------------------------------------
+        localhost:
+          ansible_connection: local
+
+        # -----------------------------------------------------------
+        # opnsense - Firewall / Router appliance
+        # -----------------------------------------------------------
+        opnsense:
+          wan_ip: "10.243.77.222"     # External IP for firewall management
+          # Add ansible_host if you plan to manage it directly via SSH
+
+        # -----------------------------------------------------------
+        # mgmt_kvm - Management hypervisor running OpenSpace VMs
+        # -----------------------------------------------------------
+        mgmt_kvm:
+          ansible_host: 10.243.77.212       # SSH target address for mgmt_kvm
+
+          # Network interfaces for this physical server
+          wan_address: "{{ ansible_host }}"
+          wan_interface: "eno12409"
+          mgmt_address: "192.168.2.6"
+          mgmt_interface: "eno12399"
+          idrac_address: "192.168.0.4"
+          idrac_interface: "ens3f0"
+          prov_interface: "eno8303"
+
       children:
-        mgmt_svr:
-          hosts:
-            mgmt_kvm: 
-              ansible_host: 10.243.77.212
-              ansible_user: kratos
-              ansible_ssh_pass: "kratos"
-              ansible_become_pass: "kratos"
+        # =============================================================
+        #  Cluster Definitions
+        # =============================================================
+        clusters:
+          children:
+            # -----------------------------------------------------------
+            # Infrastructure Cluster
+            # Core management services (e.g., Rancher, RKE2 control plane)
+            # -----------------------------------------------------------
+            infrastructure_cluster:
+              children:
+                mcm_production:
+                  vars:
+                    cluster_name: "mcm"
+                    cluster_ssh_key: "mcm_ssh_key"
+                  hosts:
+                    mcm1:
+                      ansible_host: 192.168.2.8
+                      mgmt_interface: "enp1s0"
+          
+            downstream_clusters:
+              vars:
+                # -----------------------------------------------------------
+                # List of clusters to deploy - Taken from below
+                #   - If new cluster added, please update this list
+                # -----------------------------------------------------------
+                clusters_to_deploy:
+                  - osms_production
+                  - osdc_production
+                  
+              children:
+                # -----------------------------------------------------------
+                # OpenSpace Management Cluster
+                # Runs the OpenSpace services (e.g., OpsCenter, OC2)
+                # -----------------------------------------------------------
+                openspace_management_cluster:
+                  children:
+                    osms_production:
+                      vars:
+                        cluster_name: "osms"
+                        cluster_ssh_key: "osms_ssh_key"
+                        deployment_yaml: "/install/data/files/osms_deployment.yml"
+                      hosts:
+                        osms1:
+                          ansible_host: 192.168.2.9
+                          mgmt_interface: "enp1s0"
 
-              wan_address: "{{ hostvars['mgmt_kvm'].ansible_host }}"
-              wan_interface: "eno12409"
-
-              mgmt_address: "192.168.2.6"
-              mgmt_interface: "eno12399"
-
-              idrac_address: "192.168.0.4"
-              idrac_interface: "ens3f0"
-
-              prov_interface: "eno8303"
-                
-        vms:
-          hosts:
-            mcm: 
-              ansible_host: 192.168.2.8
-              mgmt_interface: "enp1s0"
-              ansible_user: "kratos"
-              ansible_ssh_pass: "kratos"
-              ansible_become_pass: "kratos"
-            osms: 
-              ansible_host: 192.168.2.9
-              mgmt_interface: "enp1s0"
-              ansible_user: "kratos"
-              ansible_ssh_pass: "kratos"
-              ansible_become_pass: "kratos"
-            opnsense:
-              wan_ip: "10.243.77.222"
-                
-        osdc:
-          hosts:
-            osdc1: 
-              ansible_host: 192.168.0.16
-              interface: "enp1s0"
-              mac_address: "30:3E:A7:2E:3A:8B"
-            osdc2: 
-              ansible_host: 192.168.0.17
-              interface: "enp1s0"
-              mac_address: "30:3E:A7:2E:3A:8C"
+                # -----------------------------------------------------------
+                # OpenSpace Data Cluster
+                # Runs OpenSpace data services (e.g., Qradio, Scheduler)
+                # -----------------------------------------------------------
+                openspace_data_cluster:
+                  children:
+                    osdc_production:
+                      vars:
+                        cluster_name: "osdc"
+                        cluster_ssh_key: "osdc_ssh_key"
+                        deployment_yaml: "/install/data/files/osdc_deployment.yml"
+                      hosts:
+                        osdc1: 
+                          ansible_host: 192.168.0.16
+                          mgmt_interface: "enp1s0"
+                          mac_address: "30:3E:A7:2E:3A:8B"
+                        osdc2: 
+                          ansible_host: 192.168.0.17
+                          mgmt_interface: "enp1s0"
+                          mac_address: "30:3E:A7:2E:3A:8C"

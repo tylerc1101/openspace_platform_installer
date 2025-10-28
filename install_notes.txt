@@ -1,0 +1,4 @@
+clear screen at the start (or run in tmux session?)
+
+Check server requirements / give a requirements.txt that labels minimum drive sizes
+    (this clears up the export)

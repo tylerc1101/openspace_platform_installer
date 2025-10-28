@@ -1,74 +1,21 @@
 ---
-- name: Build cluster list and apply their manifests
-  hosts: "{{ target_hosts }}"
-  run_once: true
+- name: Deploy Downstream Clusters
+  hosts: localhost
+  gather_facts: false
   vars:
+    # Get the list of clusters to deploy from inventory
+    clusters_list: "{{ hostvars['localhost']['clusters_to_deploy'] }}"
     env_dir: "/docker-workspace/config/{{ env_name }}"
-    kubeconfig_path: "{{ lookup('env','KUBECONFIG') | default('/root/.kube/config', true) }}"
-
+  
   tasks:
-    - name: Build cluster context from inventory (rep host + vars)
-      set_fact:
-        clusters: >-
-          {{
-            (clusters | default([])) + [
-              {
-                'group': item,
-                'rep_host': (groups[item] | first),
-                'deployment_yaml': hostvars[groups[item] | first].deployment_yaml,
-                'cluster_name': hostvars[groups[item] | first].cluster_name,
-                'cluster_ssh_key': hostvars[groups[item] | first].cluster_ssh_key
-              }
-            ]
-          }}
-      loop: "{{ clusters_to_deploy }}"
-      when:
-        - groups[item] is defined
-        - (groups[item] | length) > 0
+    - name: Display clusters to deploy
+      ansible.builtin.debug:
+        msg: "Clusters to deploy: {{ clusters_list }}"
 
-    - name: Fail if any requested cluster group has no hosts
-      fail:
-        msg: "Requested cluster group {{ item }} has no hosts; cannot resolve its vars"
-      when: groups[item] is not defined or (groups[item] | length) == 0
-      loop: "{{ clusters_to_deploy }}"
-
-    - name: Apply manifest for each cluster
-      kubernetes.core.k8s:
-        state: present
-        # If your manifest is a Jinja2 template (*.j2):
-        definition: "{{ lookup('template', item.deployment_yaml) | from_yaml }}"
-        # If it's plain YAML (no Jinja), use:
-        # definition: "{{ lookup('file', item.deployment_yaml) | from_yaml }}"
-        kubeconfig: "{{ kubeconfig_path }}"
-        # context: "{{ k8s_context | default(omit) }}"
-        # apply: yes    # (optional) server-side apply
-      loop: "{{ clusters }}"
+    - name: Process each downstream cluster
+      include_tasks: deploy_single_cluster.yml
+      vars:
+        env_dir: "{{ env_dir }}"
+      loop: "{{ clusters_list }}"
       loop_control:
-        label: "{{ item.group }}"
-      delegate_to: localhost
-
-    - name: Wait for {{ item.cluster_name }} CR to be Ready
-      kubernetes.core.k8s_info:
-        api_version: openspace.kratos.us/v1alpha2
-        kind: OpenspaceManagementSystem      # use OpenspaceDataCluster for OSDC
-        name: "{{ item.cluster_name }}"
-        namespace: "{{ rancher_namespace | default('openspace-system') }}"
-      register: cr_info
-      until: >
-        cr_info.resources
-        and cr_info.resources[0].status is defined
-        and cr_info.resources[0].status.conditions is defined
-        and (
-          cr_info.resources[0].status.conditions
-          | selectattr('status','equalto','True')
-          | selectattr('type','in',['Ready','ClusterReady','Available'])
-          | list
-          | length
-        ) > 0
-      retries: 60        # ~10 minutes at 10s intervals; tune as needed
-      delay: 10
-      delegate_to: localhost
-      loop: "{{ clusters }}"
-      loop_control:
-        label: "{{ item.cluster_name }}"
-
+        loop_var: cluster_group_name

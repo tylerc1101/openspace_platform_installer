@@ -19,6 +19,18 @@ requirements:
     - "/docker-workspace/config/{env}/.ssh/onboarder_ssh_key.pub"
 
 steps:
+  - id: prep_onboarder_container
+    description: "Prep Onboarder Container"
+    hosts: 
+      - localhost
+    kind: ansible
+    file: "tasks/common/prep_onboarder_container.yml"
+    args:
+      - "-e env_name={env}"
+    on_failure: fail
+    required: true
+    timeout: 600
+
   - id: copy_mgmt_kvm_ssh_key
     description: "Copy SSH Key to mgmt_kvm"
     hosts: 
@@ -109,18 +121,6 @@ steps:
     required: true
     timeout: 1800
 
-  - id: prep_onboarder_container
-    description: "Prep Onboarder Container"
-    hosts: 
-      - localhost
-    kind: ansible
-    file: "tasks/common/prep_onboarder_container.yml"
-    args:
-      - "-e env_name={env}"
-    on_failure: fail
-    required: true
-    timeout: 600
-
   - id: copy_mcm_ssh_key
     description: "Copy SSH Key to MCM"
     hosts: 
@@ -133,12 +133,22 @@ steps:
     on_failure: fail
     required: true
 
+  - id: configure_vm_partitions
+    description: "Adjust vm partition sizes for Rhel VM"
+    hosts:
+      - downstream_clusters
+    kind: ansible
+    file: "tasks/common/configure-vm-partitions.yml"
+    args:
+    on_failure: fail
+    required: true
+
   - id: deploy_rke2_cluster
     description: "Deploy RKE2 Cluster"
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace ansible-deploy-rke2-cluster ENVIRONMENT={env}/generated_files"
+    command: "make -C /docker-workspace ansible-deploy-rke2-cluster ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -148,7 +158,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace bootstrap-container-images-run ENVIRONMENT={env}/generated_files"
+    command: "make -C /docker-workspace bootstrap-container-images-run ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -158,7 +168,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={env}/generated_files"
+    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -168,7 +178,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace load-darksite-bundles ENVIRONMENT={env}/generated_files"
+    command: "make -C /docker-workspace load-darksite-bundles ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -178,7 +188,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={env}/generated_files"
+    command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -188,7 +198,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace terraform-rancher-bootstrap-apply ENVIRONMENT={env}/generated_files"
+    command: "make -C /docker-workspace terraform-rancher-bootstrap-apply ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 1800
@@ -198,7 +208,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace install-gitea ENVIRONMENT={env}/generated_files"
+    command: "make -C /docker-workspace install-gitea ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600
@@ -208,7 +218,7 @@ steps:
     hosts: 
       - localhost
     kind: command
-    command: "make -C /docker-workspace install-argocd ENVIRONMENT={env}/generated_files"
+    command: "make -C /docker-workspace install-argocd ENVIRONMENT={env}"
     on_failure: fail
     required: true
     timeout: 3600

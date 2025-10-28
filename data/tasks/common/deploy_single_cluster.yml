@@ -1,0 +1,66 @@
+---
+# This file is included for each cluster in clusters_to_deploy
+# cluster_group_name is passed from the main playbook
+
+- name: Get cluster details from inventory
+  ansible.builtin.set_fact:
+    cluster_vars: "{{ hostvars[groups[cluster_group_name][0]] }}"
+
+- name: Display cluster information
+  ansible.builtin.debug:
+    msg: 
+      - "Processing cluster: {{ cluster_group_name }}"
+      - "Cluster name: {{ cluster_vars.cluster_name }}"
+      - "SSH key name: {{ cluster_vars.cluster_ssh_key }}"
+      - "Deployment YAML: {{ cluster_vars.deployment_yaml }}"
+
+- name: Read SSH private key for cluster
+  ansible.builtin.slurp:
+    src: "{{ env_dir }}/.ssh/{{ cluster_vars.cluster_ssh_key }}"
+  register: ssh_private_key_content
+
+- name: Create temporary secret YAML for cluster
+  ansible.builtin.copy:
+    content: |
+      apiVersion: v1
+      kind: Secret
+      metadata:
+        name: {{ cluster_vars.cluster_ssh_key }}
+        namespace: openspace-system
+      type: Opaque
+      data:
+        sshKey: {{ ssh_private_key_content.content }}
+        username: {{ ansible_user }}
+    dest: "{{ env_dir }}/generated_files/{{ cluster_vars.cluster_name }}_ssh_secret.yaml"
+
+- name: Apply SSH secret to Kubernetes
+  ansible.builtin.command:
+    cmd: kubectl apply -f {{ env_dir }}/generated_files/{{ cluster_vars.cluster_name }}_ssh_secret.yaml
+  register: secret_apply_result
+  changed_when: "'configured' in secret_apply_result.stdout or 'created' in secret_apply_result.stdout"
+
+- name: Display secret deployment result
+  ansible.builtin.debug:
+    msg: "Secret deployment: {{ secret_apply_result.stdout }}"
+
+- name: Check if cluster already exists
+  ansible.builtin.command:
+    cmd: kubectl get cluster {{ cluster_vars.cluster_name }} -n openspace-system
+  register: cluster_check
+  failed_when: false
+  changed_when: false
+
+- name: Display cluster check result
+  ansible.builtin.debug:
+    msg: "Cluster exists: {{ cluster_check.rc == 0 }}"
+
+- name: Apply cluster deployment YAML if cluster doesn't exist
+  ansible.builtin.command:
+    cmd: kubectl apply -f {{ env_dir }}/generated_files/{{ cluster_vars.deployment_yaml }}
+  when: cluster_check.rc != 0
+  register: cluster_deploy_result
+
+- name: Display cluster deployment result
+  ansible.builtin.debug:
+    msg: "Cluster deployment: {{ cluster_deploy_result.stdout | default('Cluster already exists, skipped') }}"
+  when: cluster_deploy_result is defined

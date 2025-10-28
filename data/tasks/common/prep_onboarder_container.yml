@@ -3,10 +3,10 @@
   vars:
     env_name: "{{ env_name | mandatory }}"
     config_dir: "/docker-workspace/config"
-    cluster_dir: "{{ config_dir }}/{{ env_name }}/generated_files"
+    env_dir: "{{ config_dir }}/{{ env_name }}"
     sample_vsphere_dir: "{{ config_dir }}/sample-vsphere"
     cache_dir: "{{ cluster_dir }}/.cache"
-    ssh_user: "{{ hostvars['mcm'].ansible_user }}"
+    ssh_user: "{{ ansible_user }}"
     common_dir: "{{ config_dir }}/common"
   
   tasks:
@@ -23,7 +23,7 @@
     - name: Deploy Makefile
       template:
         src: /install/data/templates/basekit_makefile.j2
-        dest: "{{ cluster_dir }}/Makefile"
+        dest: "{{ env_dir }}/Makefile"
         owner: root
         group: root
         mode: '0644'

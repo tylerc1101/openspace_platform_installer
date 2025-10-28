@@ -19,7 +19,7 @@ all:
         # ===========================================================
         #  Image References - File names for required images
         # ===========================================================
-        onboarder: "onboarder-full.v3.5.0-rc7.tar.gz"
+        onboarder: "onboarder-full_v3.6.0-rc4.tar.gz"
         basekit: "base-kit-1.0.1"
         osms: "openspace-1.9.0-295.os-app"
 

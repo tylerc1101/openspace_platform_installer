@@ -1,6 +1,6 @@
 ---
 - name: Expand disk partition and logical volumes
-  hosts: target_hosts
+  hosts: "{{ target_hosts }}"
   become: yes
   gather_facts: yes
   

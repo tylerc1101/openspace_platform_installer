@@ -1,6 +1,6 @@
 ---
-- name: Expand disk partition and logical volumes (using growpart)
-  hosts: "{{ target_hosts }}"
+- name: Expand disk partition and logical volumes (idempotent)
+  hosts: target_hosts
   become: yes
   gather_facts: yes
   
@@ -19,50 +19,127 @@
       - { name: lv_root, percent: 100, mount: / }
 
   tasks:
-    - name: Install cloud-utils-growpart if not present
-      package:
-        name: cloud-utils-growpart
-        state: present
-        disable_gpg_check: yes
-      when: ansible_os_family == "RedHat"
+    - name: Check if partition exists
+      shell: "parted {{ disk_device }} print | grep '^ {{ partition_number }}'"
+      register: partition_check
+      changed_when: false
+      failed_when: false
 
-    - name: Grow partition to use all available space
-      command: growpart {{ disk_device }} {{ partition_number }}
-      register: growpart_result
-      failed_when:
-        - growpart_result.rc != 0
-        - "'NOCHANGE' not in growpart_result.stdout"
-      changed_when: "'CHANGED' in growpart_result.stdout"
+    - name: Skip if partition doesn't exist
+      meta: end_host
+      when: partition_check.rc != 0
 
-    - name: Resize physical volume
+    - name: Get partition and disk information
+      shell: |
+        DISK_END=$(parted {{ disk_device }} unit s print free 2>/dev/null | grep "Disk {{ disk_device }}" | awk '{print $3}' | sed 's/s//')
+        PART_END=$(parted {{ disk_device }} unit s print 2>/dev/null | grep "^ {{ partition_number }}" | awk '{print $3}' | sed 's/s//')
+        PART_START=$(parted {{ disk_device }} unit s print 2>/dev/null | grep "^ {{ partition_number }}" | awk '{print $2}')
+        
+        echo "DISK_END=$DISK_END"
+        echo "PART_END=$PART_END"
+        echo "PART_START=$PART_START"
+        
+        # Check if partition is within 2048 sectors of disk end (1MB tolerance)
+        if [ "$PART_END" -ge "$((DISK_END - 2048))" ]; then
+          echo "NEEDS_RESIZE=false"
+        else
+          echo "NEEDS_RESIZE=true"
+          echo "AVAILABLE_SECTORS=$((DISK_END - PART_END))"
+        fi
+      register: partition_info
+      changed_when: false
+
+    - name: Parse partition information
+      set_fact:
+        part_start: "{{ partition_info.stdout | regex_search('PART_START=([^\\s]+)', '\\1') | first }}"
+        needs_partition_resize: "{{ 'NEEDS_RESIZE=true' in partition_info.stdout }}"
+
+    - name: Display partition status
+      debug:
+        msg: "Partition {{ partition_number }}: {{ 'needs expansion' if needs_partition_resize else 'already at maximum size' }}"
+
+    - name: Expand partition if needed
+      block:
+        - name: Remove and recreate partition
+          shell: |
+            set -e
+            parted {{ disk_device }} --script -- rm {{ partition_number }}
+            parted {{ disk_device }} --script -- mkpart primary {{ part_start }} 100%
+            parted {{ disk_device }} --script -- set {{ partition_number }} lvm on
+          args:
+            executable: /bin/bash
+
+        - name: Inform kernel of partition changes
+          command: partprobe {{ disk_device }}
+          failed_when: false
+
+        - name: Alternative kernel notification
+          command: partx -u {{ disk_device }}
+          failed_when: false
+
+        - name: Wait for kernel to process changes
+          pause:
+            seconds: 2
+      when: needs_partition_resize | bool
+
+    - name: Resize physical volume (always safe to run)
       command: pvresize {{ disk_device }}{{ partition_number }}
+      register: pvresize_result
+      changed_when: "'Physical volume' in pvresize_result.stdout and 'changed' in pvresize_result.stdout"
 
-    - name: Get volume group information
-      command: vgs --noheadings -o vg_free {{ vg_name }}
+    - name: Get volume group free space
+      shell: vgs --noheadings -o vg_free_count {{ vg_name }}
       register: vg_info
       changed_when: false
 
-    - name: Display free space
-      debug:
-        msg: "Free space in {{ vg_name }}: {{ vg_info.stdout | trim }}"
+    - name: Set free extents fact
+      set_fact:
+        vg_free_extents: "{{ vg_info.stdout | trim | int }}"
 
-    - name: Extend logical volumes
+    - name: Display volume group status
+      debug:
+        msg: "Volume group {{ vg_name }} has {{ vg_free_extents }} free extents"
+
+    - name: Extend logical volumes if space available
       command: "lvextend -l +{{ item.percent }}%FREE /dev/{{ vg_name }}/{{ item.name }}"
       loop: "{{ lv_expansions }}"
       register: lv_extend_result
+      when: vg_free_extents | int > 0
+      changed_when: 
+        - lv_extend_result.rc == 0
+        - "'matches existing size' not in lv_extend_result.stdout"
       failed_when: 
         - lv_extend_result.rc != 0
         - "'matches existing size' not in lv_extend_result.stderr"
+        - "'matches existing size' not in lv_extend_result.stdout"
 
-    - name: Grow XFS filesystems
-      command: "xfs_growfs {{ item.mount }}"
-      loop: "{{ lv_expansions }}"
+    - name: Grow XFS filesystems for extended volumes
+      command: "xfs_growfs {{ item.item.mount }}"
+      loop: "{{ lv_extend_result.results }}"
+      when: 
+        - vg_free_extents | int > 0
+        - item.changed | default(false)
+      loop_control:
+        label: "{{ item.item.name }}"
 
-    - name: Verify filesystem sizes
+    - name: Report status
+      debug:
+        msg: >-
+          {% if not needs_partition_resize and vg_free_extents | int == 0 %}
+          System already configured - no changes needed
+          {% elif needs_partition_resize %}
+          Partition expanded and logical volumes extended
+          {% elif vg_free_extents | int > 0 %}
+          Logical volumes extended (partition was already at max)
+          {% else %}
+          No free space available for expansion
+          {% endif %}
+
+    - name: Display final filesystem sizes
       command: df -h
       register: df_output
       changed_when: false
 
-    - name: Display filesystem sizes
+    - name: Show filesystem sizes
       debug:
         var: df_output.stdout_lines

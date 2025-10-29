@@ -136,7 +136,7 @@ steps:
   - id: configure_vm_partitions
     description: "Adjust vm partition sizes for Rhel VM"
     hosts:
-      - downstream_clusters
+      - clusters
     kind: ansible
     file: "tasks/basekit/configure-vm-partitions.yml"
     args:

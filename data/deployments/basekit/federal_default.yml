@@ -31,17 +31,15 @@ steps:
     required: true
     timeout: 600
 
-  - id: preflight_check
-    description: "Run Preflight Checks"
-    hosts:
-      - deployment
+  - id: bootstrap_mgmt_kvm
+    description: "Bootstrap Mgmt KVM"
+    hosts: 
+      - mgmt_kvm
     kind: ansible
-    file: "tasks/common/preflight_check.yml"
-    args:
-      - "-e env_name={env}"
+    file: "tasks/basekit/bootstrap-mgmt-kvm.yml"
     on_failure: fail
     required: true
-    timeout: 600
+    timeout: 1800
 
   - id: copy_mgmt_kvm_ssh_key
     description: "Copy SSH Key to mgmt_kvm"
@@ -54,16 +52,6 @@ steps:
       - "-e ssh_pubkey_path=/docker-workspace/config/{env}/.ssh/onboarder_ssh_key.pub"
     on_failure: fail
     required: true
-
-  - id: bootstrap_mgmt_kvm
-    description: "Bootstrap Mgmt KVM"
-    hosts: 
-      - mgmt_kvm
-    kind: ansible
-    file: "tasks/basekit/bootstrap-mgmt-kvm.yml"
-    on_failure: fail
-    required: true
-    timeout: 1800
 
   - id: deploy_vms
     description: "Deploy VMs"

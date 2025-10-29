@@ -3,6 +3,12 @@
   hosts: "{{ target_hosts | default('mgmt_kvm') }}"
   become: true
 
+  pre_tasks:
+    - name: Ping hosts
+      import_tasks: ping_hosts.yml
+      vars:
+        target_hosts: "{{ target_hosts }}" 
+
   tasks:
     - name: Set Hostname
       hostname:

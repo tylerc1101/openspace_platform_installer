@@ -14,8 +14,6 @@
 
     - name: Process each downstream cluster
       include_tasks: deploy_single_cluster.yml
-      vars:
-        env_dir: "{{ env_dir }}"
       loop: "{{ clusters_list }}"
       loop_control:
         loop_var: cluster_group_name

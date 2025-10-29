@@ -60,7 +60,7 @@
     # e) Fix cilium bug
     - name: Disable Cilium encryption in valuesContent block
       ansible.builtin.replace:
-        path: scripts/init-rke2-ansible/gen_ansible_inventory.sh
+        path: /docker-workspace/scripts/init-rke2-ansible/gen_ansible_inventory.sh
         # Match 'encryption:' … then the specific 'enabled: true' before 'type: wireguard'
         regexp: '(?ms)^(\s*encryption:\s*\n\s*enabled:\s*)true(?=\s*\n\s*type:\s*wireguard)'
         replace: '\1false'

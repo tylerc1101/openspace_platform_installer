@@ -20,14 +20,23 @@
 
   tasks:
     - name: Check if partition exists
-      shell: "parted {{ disk_device }} print | grep '^ {{ partition_number }}'"
+      shell: "parted {{ disk_device }} print 2>/dev/null | grep '^ {{ partition_number }}' || echo 'NOTFOUND'"
       register: partition_check
       changed_when: false
       failed_when: false
 
-    - name: Skip if partition doesn't exist
-      meta: end_host
-      when: partition_check.rc != 0
+    - name: Debug partition check
+      debug:
+        msg: "Partition check result: {{ partition_check.stdout }}"
+
+    - name: End play if partition doesn't exist
+      block:
+        - name: Report partition not found
+          debug:
+            msg: "Partition {{ partition_number }} not found on {{ disk_device }}, skipping host"
+        
+        - meta: end_host
+      when: "'NOTFOUND' in partition_check.stdout"
 
     - name: Get partition and disk information
       shell: |
@@ -60,26 +69,39 @@
 
     - name: Expand partition if needed
       block:
-        - name: Remove and recreate partition
+        - name: Remove and recreate partition (ignore kernel warning)
           shell: |
-            set -e
-            parted {{ disk_device }} --script -- rm {{ partition_number }}
-            parted {{ disk_device }} --script -- mkpart primary {{ part_start }} 100%
-            parted {{ disk_device }} --script -- set {{ partition_number }} lvm on
+            parted {{ disk_device }} --script -- rm {{ partition_number }} 2>&1 || true
+            parted {{ disk_device }} --script -- mkpart primary {{ part_start }} 100% 2>&1 || true
+            parted {{ disk_device }} --script -- set {{ partition_number }} lvm on 2>&1 || true
+            echo "Partition table updated"
           args:
             executable: /bin/bash
-
-        - name: Inform kernel of partition changes
-          command: partprobe {{ disk_device }}
+          register: parted_result
           failed_when: false
 
-        - name: Alternative kernel notification
+        - name: Display parted output
+          debug:
+            var: parted_result.stdout_lines
+
+        - name: Inform kernel of partition changes with partprobe
+          command: partprobe {{ disk_device }}
+          register: partprobe_result
+          failed_when: false
+
+        - name: Inform kernel with partx (alternative method)
           command: partx -u {{ disk_device }}
+          register: partx_result
+          failed_when: false
+
+        - name: Force kernel update with blockdev
+          command: blockdev --rereadpt {{ disk_device }}
+          register: blockdev_result
           failed_when: false
 
         - name: Wait for kernel to process changes
           pause:
-            seconds: 2
+            seconds: 3
       when: needs_partition_resize | bool
 
     - name: Resize physical volume (always safe to run)

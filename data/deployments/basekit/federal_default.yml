@@ -31,6 +31,18 @@ steps:
     required: true
     timeout: 600
 
+  - id: preflight_check
+    description: "Run Preflight Checks"
+    hosts:
+      - deployment
+    kind: ansible
+    file: "tasks/common/preflight_check"
+    args:
+      - "-e env_name={env}"
+    on_failure: fail
+    required: true
+    timeout: 600
+
   - id: copy_mgmt_kvm_ssh_key
     description: "Copy SSH Key to mgmt_kvm"
     hosts: 

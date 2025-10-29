@@ -1,0 +1,6 @@
+- name: Preflight Checks
+  hosts: deployment
+
+  tasks:
+    - name: Ping hosts
+      ping:

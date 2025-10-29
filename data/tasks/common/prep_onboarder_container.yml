@@ -5,7 +5,7 @@
     config_dir: "/docker-workspace/config"
     env_dir: "{{ config_dir }}/{{ env_name }}"
     sample_vsphere_dir: "{{ config_dir }}/sample-vsphere"
-    cache_dir: "{{ cluster_dir }}/.cache"
+    cache_dir: "{{ env_dir }}/.cache"
     ssh_user: "{{ ansible_user }}"
     common_dir: "{{ config_dir }}/common"
   

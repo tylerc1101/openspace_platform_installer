@@ -24,19 +24,3 @@
         cmd: update-ca-trust extract
       changed_when: false
       when: cert_copy_result.changed
-
-    - name: Check if secret exists
-      ansible.builtin.command:
-        cmd: kubectl get secret -n openspace-system {{ cluster_ssh_key }}
-      register: get_secret
-      changed_when: false
-      failed_when: get_secret.rc not in [0,1]
-
-    - name: Create secret if not found
-      ansible.builtin.command:
-        cmd: >
-          kubectl create secret generic -n openspace-system {{ cluster_ssh_key }}
-          --type=opaque
-          --from-literal=username={{ ansible_host }}
-          --from-file=sshKey={{ ssh_key_path }}
-      when: get_secret.rc != 0

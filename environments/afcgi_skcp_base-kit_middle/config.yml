@@ -37,28 +37,27 @@ all:
         # Domain used across the environment (used in DNS, certs, etc.)
         domain_name: "base-kit.kratos"
 
-        # -----------------------------------------------------------
         # Customer Network - WAN/External network info
-        # -----------------------------------------------------------
         customer_network:
           gateway: "10.243.76.1"
           cidr: "/23"
           dns_servers: ["10.243.25.50", "10.243.25.53"]
 
-        # -----------------------------------------------------------
         # Management Network - Internal cluster communication network
-        # -----------------------------------------------------------
         mgmt_network:
           network: "192.168.2"
           cidr: "/24"
           gateway: "192.168.2.1"
           dns_servers: ["192.168.2.1"]
 
-        # -----------------------------------------------------------
         # NTP Server - Time synchronization source
-        # -----------------------------------------------------------
         ntp:
           server: "192.168.2.100"
+        
+        # List of clusters to deploy - Taken from below
+        clusters_to_deploy:
+          - osms_production
+        #  - osdc_production
 
       # =============================================================
       #  Standalone / Utility Hosts
@@ -118,15 +117,6 @@ all:
                       mgmt_interface: "enp1s0"
           
             downstream_clusters:
-              vars:
-                # -----------------------------------------------------------
-                # List of clusters to deploy - Taken from below
-                #   - If new cluster added, please update this list
-                # -----------------------------------------------------------
-                clusters_to_deploy:
-                  - osms_production
-                #  - osdc_production
-                  
               children:
                 # -----------------------------------------------------------
                 # OpenSpace Management Cluster

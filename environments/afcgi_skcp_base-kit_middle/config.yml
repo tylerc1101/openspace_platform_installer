@@ -100,7 +100,7 @@ all:
         clusters:
           vars:
             # SSH through mgmt_kvm bastion - dynamically reference the bastion host
-            ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q {{ bastion_user }}@{{ bastion_host }}"'
+            ansible_ssh_common_args: '-o ProxyJump={{ bastion_user }}@{{ bastion_host }}'
           children:
             # -----------------------------------------------------------
             # Infrastructure Cluster

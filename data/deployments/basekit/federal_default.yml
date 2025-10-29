@@ -36,7 +36,7 @@ steps:
     hosts:
       - deployment
     kind: ansible
-    file: "tasks/common/preflight_check"
+    file: "tasks/common/preflight_check.yml"
     args:
       - "-e env_name={env}"
     on_failure: fail

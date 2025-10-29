@@ -27,8 +27,6 @@ SECURITY: was given PASSWORD in the clear in log:
 
 NOTE: Need to make onboarder changes persistent
 
-BREAKS: Need to add the cilium encryption false step into onboarder prep
-
 NOTE: Mount the env directory to the /docker-workspace/config directory. Then have the container running all the time.
     I just go inside when I want to do something, Or have a script outside that will call the commands I need (like the onboarder-run)
     I am getting tired of things not working and being forced to do weird things to get in the container. Just should leave it running
@@ -53,11 +51,13 @@ NOTE: ADD all vars to group_vars/all.yml (or deployment.yml)
 
 NOTE: Prep_onboarder step should run everytime to ensure that the container is going to run correctly for the required deployment
 
+NOTE: Have a flag in the deployment yaml for run_always: true. That way the onboarder steps can always run
 
 
 
 
 
+#BREAKS: Need to add the cilium encryption false step into onboarder prep
 
 
 BREAKS: Check server requirements / give a requirements.txt that labels minimum drive sizes

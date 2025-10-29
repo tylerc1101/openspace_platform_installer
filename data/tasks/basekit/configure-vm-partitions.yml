@@ -1,5 +1,5 @@
 ---
-- name: Expand disk partition and logical volumes
+- name: Expand disk partition and logical volumes (using growpart)
   hosts: "{{ target_hosts }}"
   become: yes
   gather_facts: yes
@@ -9,7 +9,6 @@
     partition_number: 3
     vg_name: vg_root
     
-    # LV expansion percentages
     lv_expansions:
       - { name: lv_log, percent: 4, mount: /var/log }
       - { name: lv_vmp, percent: 4, mount: /var/tmp }
@@ -20,36 +19,19 @@
       - { name: lv_root, percent: 100, mount: / }
 
   tasks:
-    - name: Get current partition information
-      command: parted {{ disk_device }} unit MB print
-      register: partition_info
-      changed_when: false
-
-    - name: Extract partition start location
-      set_fact:
-        partition_start: "{{ partition_info.stdout | regex_search('\\s+' + partition_number|string + '\\s+(\\d+\\.?\\d*)MB', '\\1') | first }}"
-
-    - name: Display partition start (for verification)
-      debug:
-        msg: "Partition {{ partition_number }} starts at {{ partition_start }}MB"
-
-    - name: Remove existing partition
-      parted:
-        device: "{{ disk_device }}"
-        number: "{{ partition_number }}"
-        state: absent
-
-    - name: Create new partition using all available space
-      parted:
-        device: "{{ disk_device }}"
-        number: "{{ partition_number }}"
+    - name: Install cloud-utils-growpart if not present
+      package:
+        name: cloud-utils-growpart
         state: present
-        part_start: "{{ partition_start }}MB"
-        part_end: "100%"
-        flags: [ lvm ]
+      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
 
-    - name: Inform kernel of partition changes
-      command: partprobe {{ disk_device }}
+    - name: Grow partition to use all available space
+      command: growpart {{ disk_device }} {{ partition_number }}
+      register: growpart_result
+      failed_when:
+        - growpart_result.rc != 0
+        - "'NOCHANGE' not in growpart_result.stdout"
+      changed_when: "'CHANGED' in growpart_result.stdout"
 
     - name: Resize physical volume
       command: pvresize {{ disk_device }}{{ partition_number }}
@@ -74,7 +56,6 @@
     - name: Grow XFS filesystems
       command: "xfs_growfs {{ item.mount }}"
       loop: "{{ lv_expansions }}"
-      when: item.mount is defined
 
     - name: Verify filesystem sizes
       command: df -h

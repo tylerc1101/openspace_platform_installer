@@ -11,6 +11,13 @@ all:
         ansible_become_pass: "kratos"
 
         # ===========================================================
+        #  Bastion Configuration
+        # ===========================================================
+        bastion_host: "{{ hostvars['mgmt_kvm']['ansible_host'] }}"
+        bastion_user: "{{ ansible_user }}"
+        bastion_pass: "{{ ansible_ssh_pass }}"
+
+        # ===========================================================
         #  Deployment Configuration - See README for details
         # ===========================================================
         deployment_type: "basekit"                 # Which deployment type: basekit, baremetal, aws
@@ -87,9 +94,13 @@ all:
 
       children:
         # =============================================================
-        #  Cluster Definitions
+        #  Cluster Hosts / Definitions
+        #  Everything below uses the bastion host for connection
         # =============================================================
         clusters:
+          vars:
+            # SSH through mgmt_kvm bastion - dynamically reference the bastion host
+            ansible_ssh_common_args: '-o ProxyCommand="ssh -W %h:%p -q {{ bastion_user }}@{{ bastion_host }}"'
           children:
             # -----------------------------------------------------------
             # Infrastructure Cluster

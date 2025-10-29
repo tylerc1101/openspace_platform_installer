@@ -256,6 +256,32 @@ def load_container_image(runtime: str, image_path: Path) -> str:
     die(f"Failed to find image after loading from {image_path}")
 
 
+def get_container_status(runtime: str, container_name: str) -> Optional[str]:
+    """
+    Get the status of a container.
+    Returns: 'running', 'exited', or None if not found.
+    """
+    try:
+        result = subprocess.run(
+            [runtime, "ps", "-a", "--filter", f"name=^{container_name}$", 
+             "--format", "{{.Status}}"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        
+        status = result.stdout.strip()
+        if not status:
+            return None
+        
+        if status.lower().startswith('up'):
+            return 'running'
+        else:
+            return 'exited'
+    except subprocess.CalledProcessError:
+        return None
+
+
 def remove_existing_container(runtime: str, container_name: str) -> None:
     """Remove existing container if it exists."""
     try:
@@ -277,6 +303,58 @@ def remove_existing_container(runtime: str, container_name: str) -> None:
         pass
 
 
+def start_existing_container(runtime: str, container_name: str) -> bool:
+    """
+    Start an existing stopped container.
+    Returns True if successful, False if container doesn't exist.
+    """
+    status = get_container_status(runtime, container_name)
+    
+    if status is None:
+        return False
+    
+    if status == 'running':
+        print_info(f"Container {container_name} is already running")
+        return True
+    
+    # Container exists but is stopped - start it
+    print_info(f"Starting existing container: {container_name}")
+    try:
+        subprocess.run(
+            [runtime, "start", container_name],
+            check=True,
+            stdout=subprocess.DEVNULL
+        )
+        print_success(f"Container {container_name} started")
+        return True
+    except subprocess.CalledProcessError as e:
+        print_error(f"Failed to start container: {e}")
+        return False
+
+
+def run_command_in_container(
+    runtime: str,
+    container_name: str,
+    cmd_args: List[str]
+) -> int:
+    """
+    Execute a command in an existing container.
+    Returns the exit code.
+    """
+    exec_cmd = [runtime, "exec", "-it", container_name] + cmd_args
+    
+    try:
+        result = subprocess.run(exec_cmd)
+        return result.returncode
+    except KeyboardInterrupt:
+        print()
+        print_warning("Interrupted by user")
+        return 130
+    except Exception as e:
+        print_error(f"Failed to execute command in container: {e}")
+        return 1
+
+
 def run_onboarder_container(
     runtime: str,
     selinux_opt: str,
@@ -294,13 +372,6 @@ def run_onboarder_container(
     Returns the exit code.
     """
     container_name = "onboarder"
-    
-    # Remove existing container
-    remove_existing_container(runtime, container_name)
-    
-    # Get UID/GID
-    uid = os.getuid()
-    gid = os.getgid()
     
     # Build command arguments
     cmd_args = [
@@ -326,7 +397,7 @@ def run_onboarder_container(
     if validate_only:
         print(f"Mode:             {Colors.YELLOW}VALIDATE ONLY{Colors.ENDC}")
     if resume:
-        print(f"Resume:           Yes")
+        print(f"Resume:           {Colors.GREEN}Yes (reusing container){Colors.ENDC}")
     if verbose:
         print(f"Verbose:          Yes")
     print(f"Logs:             {log_dir}")
@@ -334,7 +405,36 @@ def run_onboarder_container(
     print("=" * 60)
     print()
     
-    # Build container command
+    # Check if we should reuse existing container (resume mode)
+    if resume:
+        status = get_container_status(runtime, container_name)
+        
+        if status is not None:
+            # Container exists - reuse it
+            print_info(f"Resume mode: Reusing existing container '{container_name}'")
+            
+            # Start container if it's stopped
+            if status == 'exited':
+                if not start_existing_container(runtime, container_name):
+                    print_error("Failed to start existing container, creating new one...")
+                    remove_existing_container(runtime, container_name)
+                else:
+                    # Execute command in existing container
+                    return run_command_in_container(runtime, container_name, cmd_args)
+            else:
+                # Container is running, execute command
+                return run_command_in_container(runtime, container_name, cmd_args)
+    
+    # Not resume mode, or container doesn't exist - create new container
+    if not resume:
+        remove_existing_container(runtime, container_name)
+        print_info("Creating new container")
+    
+    # Get UID/GID
+    uid = os.getuid()
+    gid = os.getgid()
+    
+    # Build container command with --detach for resume capability
     container_cmd = [
         runtime, "run",
         "--name", container_name,
@@ -343,21 +443,56 @@ def run_onboarder_container(
         "-v", f"{IMAGES_DIR}:/install/images:{selinux_opt}",
         "-v", f"{env_dir}:/docker-workspace/config/{env_name}:{selinux_opt}",
         "-v", f"{log_dir}:/install/logs:{selinux_opt}",
-        "-w", "/install",
-        image_ref
-    ] + cmd_args
+        "-w", "/install"
+    ]
     
-    # Run container
-    try:
-        result = subprocess.run(container_cmd)
-        return result.returncode
-    except KeyboardInterrupt:
-        print()
-        print_warning("Interrupted by user")
-        return 130
-    except Exception as e:
-        print_error(f"Failed to run container: {e}")
-        return 1
+    # For resume mode, keep container running after command completes
+    if resume:
+        container_cmd.extend(["-d", "--entrypoint", "sleep"])
+        container_cmd.append(image_ref)
+        container_cmd.append("infinity")
+        
+        # Create the container in detached mode
+        try:
+            subprocess.run(container_cmd, check=True, stdout=subprocess.DEVNULL)
+            print_success(f"Container created: {container_name}")
+        except subprocess.CalledProcessError as e:
+            print_error(f"Failed to create container: {e}")
+            return 1
+        
+        # Now execute the actual command in the running container
+        return run_command_in_container(runtime, container_name, cmd_args)
+    else:
+        # Non-resume mode: run container normally and let it stop when done
+        container_cmd.append(image_ref)
+        container_cmd.extend(cmd_args)
+        
+        try:
+            result = subprocess.run(container_cmd)
+            return result.returncode
+        except KeyboardInterrupt:
+            print()
+            print_warning("Interrupted by user")
+            return 130
+        except Exception as e:
+            print_error(f"Failed to run container: {e}")
+            return 1
+
+
+def cleanup_container(runtime: str, container_name: str = "onboarder") -> None:
+    """
+    Cleanup/remove the onboarder container.
+    Useful for manual cleanup.
+    """
+    status = get_container_status(runtime, container_name)
+    
+    if status is None:
+        print_info(f"No container named '{container_name}' found")
+        return
+    
+    print_info(f"Stopping and removing container: {container_name}")
+    remove_existing_container(runtime, container_name)
+    print_success(f"Container '{container_name}' removed")
 
 
 def main():
@@ -375,11 +510,14 @@ Examples:
   # Validate configuration only
   ./onboarder-run.py --env=my_deployment --validate-only
   
-  # Resume from last successful step
+  # Resume from last successful step (keeps container running)
   ./onboarder-run.py --env=my_deployment --resume
   
   # Verbose output
   ./onboarder-run.py --env=my_deployment --verbose
+  
+  # Cleanup container after use
+  ./onboarder-run.py --cleanup
         """
     )
     
@@ -395,15 +533,26 @@ Examples:
     parser.add_argument(
         "--resume",
         action="store_true",
-        help="Resume from last successful step"
+        help="Resume from last successful step (keeps container alive)"
     )
     parser.add_argument(
         "--verbose", "-v",
         action="store_true",
         help="Enable verbose logging"
     )
+    parser.add_argument(
+        "--cleanup",
+        action="store_true",
+        help="Remove the onboarder container and exit"
+    )
     
     args = parser.parse_args()
+    
+    # Handle cleanup mode
+    if args.cleanup:
+        runtime, _ = detect_container_runtime()
+        cleanup_container(runtime)
+        return 0
     
     # Get environment name
     if args.env:
@@ -467,9 +616,15 @@ Examples:
     print()
     if exit_code == 0:
         print_success("✅ Onboarder completed successfully")
+        if not args.resume:
+            print_info("Note: Use --resume to keep the container running for subsequent runs")
     else:
         print_error(f"❌ Onboarder failed with exit code: {exit_code}")
         print_info(f"Check logs in: {log_dir}")
+    
+    if args.resume and exit_code == 0:
+        print_info(f"Container '{Colors.GREEN}onboarder{Colors.ENDC}' is still running and ready for next resume")
+        print_info(f"To cleanup: ./onboarder-run.py --cleanup")
     
     return exit_code
 

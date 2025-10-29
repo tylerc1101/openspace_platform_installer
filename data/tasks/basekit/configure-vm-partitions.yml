@@ -23,9 +23,8 @@
       package:
         name: cloud-utils-growpart
         state: present
-      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
-      disable_gpg_check: yes
-
+        disable_gpg_check: yes
+      when: ansible_os_family == "RedHat"
 
     - name: Grow partition to use all available space
       command: growpart {{ disk_device }} {{ partition_number }}

@@ -29,7 +29,7 @@ steps:
       - "-e env_name={env}"
     on_failure: fail
     required: true
-    timeout: 600
+    timeout: 300
 
   - id: bootstrap_mgmt_kvm
     description: "Bootstrap Mgmt KVM"
@@ -39,7 +39,7 @@ steps:
     file: "tasks/basekit/bootstrap-mgmt-kvm.yml"
     on_failure: fail
     required: true
-    timeout: 1800
+    timeout: 300
 
   - id: copy_mgmt_kvm_ssh_key
     description: "Copy SSH Key to mgmt_kvm"
@@ -52,6 +52,7 @@ steps:
       - "-e ssh_pubkey_path=/docker-workspace/config/{env}/.ssh/onboarder_ssh_key.pub"
     on_failure: fail
     required: true
+    timeout: 300
 
   - id: deploy_vms
     description: "Deploy VMs"
@@ -61,7 +62,18 @@ steps:
     file: "tasks/basekit/deploy-vms.yml"
     on_failure: fail
     required: true
-    timeout: 3600
+    timeout: 600
+
+  - id: configure_vm_partitions
+    description: "Adjust vm partition sizes for Rhel VM"
+    hosts:
+      - clusters
+    kind: ansible
+    file: "tasks/basekit/configure-vm-partitions.yml"
+    args:
+    on_failure: fail
+    required: true
+    timeout: 300
 
   - id: configure_nodes
     description: "Configure Node"
@@ -73,7 +85,7 @@ steps:
       - "-e env_name={env}"
     on_failure: fail
     required: true
-    timeout: 1800
+    timeout: 300
 
   - id: install_rke2_selinux
     description: "Install RKE2 SELinux Package"
@@ -84,7 +96,7 @@ steps:
     args:
     on_failure: fail
     required: true
-    timeout: 600
+    timeout: 300
 
   - id: configure_opnsense_config
     description: "Configure OPNsense config.xml"
@@ -96,7 +108,7 @@ steps:
       - "-e env_name={env}"
     on_failure: fail
     required: true
-    timeout: 600
+    timeout: 300
 
   - id: copy_opnsense_config
     description: "Copy OPNsense config.xml to mgmt_kvm"
@@ -108,7 +120,7 @@ steps:
       - "-e env_name={env}"
     on_failure: fail
     required: true
-    timeout: 600
+    timeout: 300
 
   - id: deploy_opnsense
     description: "Deploy OPNsense"
@@ -119,7 +131,7 @@ steps:
     command: "sudo bash /var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh"
     on_failure: fail
     required: true
-    timeout: 1800
+    timeout: 600
 
   - id: copy_mcm_ssh_key
     description: "Copy SSH Key to MCM"
@@ -132,16 +144,7 @@ steps:
       - "-e ssh_pubkey_path=/docker-workspace/config/{env}/.ssh/rancher_ssh_key.pub"
     on_failure: fail
     required: true
-
-  - id: configure_vm_partitions
-    description: "Adjust vm partition sizes for Rhel VM"
-    hosts:
-      - clusters
-    kind: ansible
-    file: "tasks/basekit/configure-vm-partitions.yml"
-    args:
-    on_failure: fail
-    required: true
+    timeout: 300
 
   - id: deploy_rke2_cluster
     description: "Deploy RKE2 Cluster"
@@ -151,7 +154,7 @@ steps:
     command: "make -C /docker-workspace ansible-deploy-rke2-cluster ENVIRONMENT={env}"
     on_failure: fail
     required: true
-    timeout: 3600
+    timeout: 600
 
   - id: bootstrap_container_images
     description: "Bootstrap Container Images"
@@ -161,7 +164,7 @@ steps:
     command: "make -C /docker-workspace bootstrap-container-images-run ENVIRONMENT={env}"
     on_failure: fail
     required: true
-    timeout: 3600
+    timeout: 600
 
   - id: deploy_harbor
     description: "Deploy Harbor to the cluster"
@@ -171,7 +174,7 @@ steps:
     command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={env}"
     on_failure: fail
     required: true
-    timeout: 3600
+    timeout: 600
 
   - id: load_darksite_bundles
     description: "Load Darksite Bundles"
@@ -181,7 +184,7 @@ steps:
     command: "make -C /docker-workspace load-darksite-bundles ENVIRONMENT={env}"
     on_failure: fail
     required: true
-    timeout: 3600
+    timeout: 600
 
   - id: deploy_rancher
     description: "Deploy Rancher to the cluster"
@@ -191,7 +194,7 @@ steps:
     command: "make -C /docker-workspace helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={env}"
     on_failure: fail
     required: true
-    timeout: 3600
+    timeout: 600
 
   - id: terraform_rancher
     description: "Terraform Rancher Configuration"
@@ -201,7 +204,7 @@ steps:
     command: "make -C /docker-workspace terraform-rancher-bootstrap-apply ENVIRONMENT={env}"
     on_failure: fail
     required: true
-    timeout: 1800
+    timeout: 300
 
   - id: deploy_gitea
     description: "Deploy Gitea to the cluster"
@@ -211,7 +214,7 @@ steps:
     command: "make -C /docker-workspace install-gitea ENVIRONMENT={env}"
     on_failure: fail
     required: true
-    timeout: 3600
+    timeout: 300
 
   - id: deploy_argocd
     description: "Deploy ArgoCD to the cluster"
@@ -221,7 +224,7 @@ steps:
     command: "make -C /docker-workspace install-argocd ENVIRONMENT={env}"
     on_failure: fail
     required: true
-    timeout: 3600
+    timeout: 300
 
   - id: prep_cluster_nodes
     description: "Prepare Cluster Nodes for Deployment"
@@ -233,7 +236,7 @@ steps:
       - "-e env_name={env}"
     on_failure: fail
     required: true
-    timeout: 1800
+    timeout: 300
 
   - id: deploy_clusters
     description: "Deploy OpenSpace Clusters"
@@ -245,7 +248,7 @@ steps:
       - "-e env_name={env}"
     on_failure: fail
     required: true
-    timeout: 3600
+    timeout: 1800
 
   #- id: deploy_opscenter
   #  description: "Deploy OpsCenter to the OSMS cluster"

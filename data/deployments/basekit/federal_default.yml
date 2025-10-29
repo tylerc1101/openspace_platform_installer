@@ -138,7 +138,7 @@ steps:
     hosts:
       - downstream_clusters
     kind: ansible
-    file: "tasks/common/configure-vm-partitions.yml"
+    file: "tasks/basekit/configure-vm-partitions.yml"
     args:
     on_failure: fail
     required: true

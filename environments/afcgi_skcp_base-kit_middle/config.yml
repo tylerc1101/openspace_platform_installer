@@ -138,19 +138,19 @@ all:
                 # OpenSpace Data Cluster
                 # Runs OpenSpace data services (e.g., Qradio, Scheduler)
                 # -----------------------------------------------------------
-                #openspace_data_cluster:
-                #  children:
-                #    osdc_production:
-                #      vars:
-                #        cluster_name: "osdc"
-                #        cluster_ssh_key: "osdc_ssh_key"
-                #        deployment_yaml: "/install/data/files/osdc_deployment.yml"
-                #      hosts:
-                #        osdc1: 
-                #          ansible_host: 192.168.0.16
-                #          mgmt_interface: "enp1s0"
-                #          mac_address: "30:3E:A7:2E:3A:8B"
-                #        osdc2: 
-                #          ansible_host: 192.168.0.17
-                #          mgmt_interface: "enp1s0"
-                #          mac_address: "30:3E:A7:2E:3A:8C"
+                openspace_data_cluster:
+                  children:
+                    osdc_production:
+                      vars:
+                        cluster_name: "osdc"
+                        cluster_ssh_key: "osdc_ssh_key"
+                        deployment_yaml: "/install/data/files/osdc_deployment.yml"
+                      hosts:
+                        osdc1: 
+                          ansible_host: 192.168.0.16
+                          mgmt_interface: "enp1s0"
+                          mac_address: "30:3E:A7:2E:3A:8B"
+                        osdc2: 
+                          ansible_host: 192.168.0.17
+                          mgmt_interface: "enp1s0"
+                          mac_address: "30:3E:A7:2E:3A:8C"

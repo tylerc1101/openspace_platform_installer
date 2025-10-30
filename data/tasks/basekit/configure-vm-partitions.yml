@@ -1,5 +1,5 @@
 ---
-- name: Expand disk partition and logical volumes (idempotent)
+- name: Expand disk partition and logical volumes
   hosts: target_hosts
   become: yes
   gather_facts: yes
@@ -19,34 +19,26 @@
       - { name: lv_root, percent: 100, mount: / }
 
   tasks:
+    - name: Pause to fix partition
+      pause:
+        minutes: 5
+        prompt: "Waiting 5 minutes, go FIX the drive partition.....Press Enter to continue early"
+
     - name: Check if partition exists
       shell: "parted {{ disk_device }} print 2>/dev/null | grep '^ {{ partition_number }}' || echo 'NOTFOUND'"
       register: partition_check
       changed_when: false
-      failed_when: false
+      failed_when: true
 
     - name: Debug partition check
       debug:
         msg: "Partition check result: {{ partition_check.stdout }}"
 
-    - name: End play if partition doesn't exist
-      block:
-        - name: Report partition not found
-          debug:
-            msg: "Partition {{ partition_number }} not found on {{ disk_device }}, skipping host"
-        
-        - meta: end_host
-      when: "'NOTFOUND' in partition_check.stdout"
-
     - name: Get partition and disk information
       shell: |
-        DISK_END=$(parted {{ disk_device }} unit s print free 2>/dev/null | grep "Disk {{ disk_device }}" | awk '{print $3}' | sed 's/s//')
-        PART_END=$(parted {{ disk_device }} unit s print 2>/dev/null | grep "^ {{ partition_number }}" | awk '{print $3}' | sed 's/s//')
-        PART_START=$(parted {{ disk_device }} unit s print 2>/dev/null | grep "^ {{ partition_number }}" | awk '{print $2}')
-        
-        echo "DISK_END=$DISK_END"
-        echo "PART_END=$PART_END"
-        echo "PART_START=$PART_START"
+        echo "DISK_END=$(parted {{ disk_device }} unit s print free 2>/dev/null | grep "Disk {{ disk_device }}" | awk '{print $3}' | sed 's/s//')"
+        echo "PART_END=$(parted {{ disk_device }} unit s print 2>/dev/null | grep "^ {{ partition_number }}" | awk '{print $3}' | sed 's/s//')"
+        echo "PART_START=$(parted {{ disk_device }} unit s print 2>/dev/null | grep "^ {{ partition_number }}" | awk '{print $2}')"
         
         # Check if partition is within 2048 sectors of disk end (1MB tolerance)
         if [ "$PART_END" -ge "$((DISK_END - 2048))" ]; then

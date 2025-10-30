@@ -88,6 +88,14 @@
       when: item.rc == 0 and 'activated' not in item.stdout
       changed_when: true
 
+    - name: Update /etc/resolv.conf with customer DNS servers
+      lineinfile:
+        path: /etc/resolv.conf
+        line: "nameserver {{ item }}"
+        create: yes
+        state: present
+      loop: "{{ customer_network.dns_servers }}"
+
     - name: Create repo file
       copy:
         src: /install/data/files/kratos.repo

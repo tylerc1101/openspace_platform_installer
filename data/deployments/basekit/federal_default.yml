@@ -1,6 +1,3 @@
-# Base-Kit Default Deployment
-# This deployment deploys a management KVM server and creates VMs for OpenSpace infrastructure
-# All configuration comes from environments/{env}/group_vars/
 
 metadata:
   name: "Base-Kit Default"
@@ -54,6 +51,41 @@ steps:
     required: true
     timeout: 300
 
+  - id: configure_opnsense_config
+    description: "Configure OPNsense config.xml"
+    hosts: 
+      - localhost
+    kind: ansible
+    file: "tasks/basekit/configure-opnsense.yml"
+    args:
+      - "-e env_name={env}"
+    on_failure: fail
+    required: true
+    timeout: 300
+
+  - id: copy_opnsense_config
+    description: "Copy OPNsense config.xml to mgmt_kvm"
+    hosts: 
+      - mgmt_kvm
+    kind: ansible
+    file: "tasks/basekit/copy-opnsense-config.yml"
+    args:
+      - "-e env_name={env}"
+    on_failure: fail
+    required: true
+    timeout: 300
+
+  - id: deploy_opnsense
+    description: "Deploy OPNsense"
+    hosts: 
+      - mgmt_kvm
+    iterate: false
+    kind: command
+    command: "sudo bash /var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh"
+    on_failure: fail
+    required: true
+    timeout: 600
+
   - id: deploy_vms
     description: "Deploy VMs"
     hosts: 
@@ -97,41 +129,6 @@ steps:
     on_failure: fail
     required: true
     timeout: 300
-
-  - id: configure_opnsense_config
-    description: "Configure OPNsense config.xml"
-    hosts: 
-      - localhost
-    kind: ansible
-    file: "tasks/basekit/configure-opnsense.yml"
-    args:
-      - "-e env_name={env}"
-    on_failure: fail
-    required: true
-    timeout: 300
-
-  - id: copy_opnsense_config
-    description: "Copy OPNsense config.xml to mgmt_kvm"
-    hosts: 
-      - mgmt_kvm
-    kind: ansible
-    file: "tasks/basekit/copy-opnsense-config.yml"
-    args:
-      - "-e env_name={env}"
-    on_failure: fail
-    required: true
-    timeout: 300
-
-  - id: deploy_opnsense
-    description: "Deploy OPNsense"
-    hosts: 
-      - mgmt_kvm
-    iterate: false
-    kind: command
-    command: "sudo bash /var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh"
-    on_failure: fail
-    required: true
-    timeout: 600
 
   - id: copy_mcm_ssh_key
     description: "Copy SSH Key to MCM"

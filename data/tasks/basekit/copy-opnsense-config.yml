@@ -4,20 +4,60 @@
     env_name: "{{ env_name | mandatory }}"
     output_dir: "/docker-workspace/config/{{ env_name }}/generated_files"
     output_file: "{{ output_dir }}/config.xml"
-    opnsense_root: /var/lib/libvirt/config
-    opnsense_parent: /var/lib/libvirt/config/vm_config
+    images_dir: /var/lib/libvirt/config
+    vm_config_dir: /var/lib/libvirt/config/vm_config
     opnsense_dir: /var/lib/libvirt/config/vm_config/opnsense
 
   tasks:
-    
     - name: Ensure directories exist
       file:
         path: "{{ item }}"
         state: directory
       loop: 
-        - "{{ opnsense_root }}"
-        - "{{ opnsense_parent }}"
+        - "{{ images_dir }}"
+        - "{{ vm_config_dir }}"
         - "{{ opnsense_dir }}"
+
+    - name: Ensure libvirt config directory exists
+      ansible.builtin.file:
+        path: "{{ images_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Check if base-kit archive variable is defined
+      ansible.builtin.fail:
+        msg: "Variable 'basekit' is not defined in group_vars"
+      when: basekit is not defined
+
+    - name: Check if libvirt config directory is empty
+      ansible.builtin.find:
+        paths: "{{ images_dir }}"
+        file_type: any
+        hidden: yes
+      register: config_dir_contents
+
+    - name: Copy base-kit config files
+      ansible.builtin.copy:
+        src: "/install/images/{{ basekit }}/config/"
+        dest: "{{ images_dir }}"
+        remote_src: no
+      when: config_dir_contents.matched == 0
+
+    - name: Set correct permissions on all images in images directory
+      ansible.builtin.file:
+        path: "{{ images_dir }}"
+        owner: qemu
+        group: qemu
+        mode: '0644'
+        recurse: yes
+
+    - name: Set correct permissions on images directory
+      ansible.builtin.file:
+        path: "{{ images_dir }}"
+        owner: qemu
+        group: qemu
+        mode: '0755'
+        recurse: no
 
     - name: Copy generated config to mgmt_kvm
       copy:
@@ -39,8 +79,8 @@
         permissions: x
         state: present
       loop: 
-        - "{{ opnsense_root }}"
-        - "{{ opnsense_parent }}"
+        - "{{ images_dir }}"
+        - "{{ vm_config_dir }}"
         - "{{ opnsense_dir }}"
 
     - name: Set SELinux file context for this nonstandard libvirt path

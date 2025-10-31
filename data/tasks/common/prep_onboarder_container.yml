@@ -19,14 +19,15 @@
         owner: root
         group: root
 
-    - name: Update /etc/resolv.conf
-      lineinfile:
-        path: /etc/resolv.conf
-        line: "nameserver {{ item }}"
-        create: yes
-        state: present
-      loop: "{{ mgmt_network.dns_servers }}"
-
+    - name: Write resolv.conf in-place (unsafe)
+      ansible.builtin.copy:
+        content: |
+          nameserver 192.168.2.1
+        dest: /etc/resolv.conf
+        owner: root
+        group: root
+        mode: '0644'
+        unsafe_writes: true
 
     # b) Modify Makefiles
     - name: Deploy Makefile

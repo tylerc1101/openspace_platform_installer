@@ -14,7 +14,7 @@
 
     - name: Deploy CA certificate
       ansible.builtin.copy:
-        src: "{{ env_dir }}/generated_files/.cache/cacerts.pem"
+        src: "{{ env_dir }}/.cache/cacerts.pem"
         dest: "/etc/pki/ca-trust/source/anchors/cacerts.pem"
         mode: '0644'
       register: cert_copy_result

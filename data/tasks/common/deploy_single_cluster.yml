@@ -31,11 +31,11 @@
       data:
         sshKey: {{ ssh_private_key_content.content }}
         username: {{ ansible_user }}
-    dest: "{{ env_dir }}/generated_files/{{ cluster_vars.cluster_name }}_ssh_secret.yaml"
+    dest: "/tmp/{{ cluster_vars.cluster_name }}_ssh_secret.yaml"
 
 - name: Apply SSH secret to Kubernetes
   ansible.builtin.command:
-    cmd: kubectl apply -f {{ env_dir }}/generated_files/{{ cluster_vars.cluster_name }}_ssh_secret.yaml
+    cmd: kubectl apply -f /tmp/{{ cluster_vars.cluster_name }}_ssh_secret.yaml
   register: secret_apply_result
   changed_when: "'configured' in secret_apply_result.stdout or 'created' in secret_apply_result.stdout"
 
@@ -54,9 +54,14 @@
   ansible.builtin.debug:
     msg: "Cluster exists: {{ cluster_check.rc == 0 }}"
 
+- name: Copy cluster deployment YAML to host
+  copy:
+    src: "{{ env_dir }}/generated_files/{{ cluster_vars.deployment_yaml }}""
+    dest: /tmp
+
 - name: Apply cluster deployment YAML if cluster doesn't exist
   ansible.builtin.command:
-    cmd: kubectl apply -f {{ env_dir }}/generated_files/{{ cluster_vars.deployment_yaml }}
+    cmd: kubectl apply -f /tmp/{{ cluster_vars.deployment_yaml }}
   when: cluster_check.rc != 0
   register: cluster_deploy_result
 

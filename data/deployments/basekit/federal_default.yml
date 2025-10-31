@@ -153,6 +153,16 @@ steps:
     required: true
     timeout: 600
 
+  #- id: configure_kubectl
+  #  description: "Configure pathing for kubectl on host"
+  #  hosts:
+  #    - infrastructure_cluster
+  #  kind: ansible
+  #  file: "tasks/common/configure_kubectl.yml"
+  #  on_failure: fail
+  #  required: true
+  #  timeout: 300
+
   - id: bootstrap_container_images
     description: "Bootstrap Container Images"
     hosts: 
@@ -238,7 +248,7 @@ steps:
   - id: deploy_clusters
     description: "Deploy OpenSpace Clusters"
     hosts:
-      - downstream_clusters
+      - mcm1
     kind: ansible
     file: "tasks/common/deploy_clusters.yml"
     args:

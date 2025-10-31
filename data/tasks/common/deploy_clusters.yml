@@ -1,19 +1,16 @@
 ---
 - name: Deploy Downstream Clusters
-  hosts: localhost
-  gather_facts: false
+  hosts: "{{ target_hosts }}"
   vars:
-    # Get the list of clusters to deploy from inventory
-    clusters_list: "{{ hostvars['localhost']['clusters_to_deploy'] }}"
     env_dir: "/docker-workspace/config/{{ env_name }}"
   
   tasks:
     - name: Display clusters to deploy
       ansible.builtin.debug:
-        msg: "Clusters to deploy: {{ clusters_list }}"
+        msg: "Clusters to deploy: {{ clusters_to_deploy }}"
 
     - name: Process each downstream cluster
       include_tasks: deploy_single_cluster.yml
-      loop: "{{ clusters_list }}"
+      loop: "{{ clusters_to_deploy }}"
       loop_control:
         loop_var: cluster_group_name

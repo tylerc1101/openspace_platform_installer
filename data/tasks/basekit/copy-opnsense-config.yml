@@ -18,70 +18,11 @@
         - "{{ vm_config_dir }}"
         - "{{ opnsense_dir }}"
 
-    - name: Ensure libvirt config directory exists
-      ansible.builtin.file:
-        path: "{{ images_dir }}"
-        state: directory
-        mode: '0755'
-
-    - name: Check if base-kit archive variable is defined
-      ansible.builtin.fail:
-        msg: "Variable 'basekit' is not defined in group_vars"
-      when: basekit is not defined
-
-    - name: Check if libvirt config directory is empty
-      ansible.builtin.find:
-        paths: "{{ images_dir }}"
-        file_type: any
-        hidden: yes
-      register: config_dir_contents
-
-    - name: Copy base-kit config files
-      ansible.builtin.copy:
-        src: "/install/images/{{ basekit }}/config/"
-        dest: "{{ images_dir }}"
-        remote_src: no
-      when: config_dir_contents.matched == 0
-
-    - name: Set correct permissions on all images in images directory
-      ansible.builtin.file:
-        path: "{{ images_dir }}"
-        owner: qemu
-        group: qemu
-        mode: '0644'
-        recurse: yes
-
-    - name: Set correct permissions on images directory
-      ansible.builtin.file:
-        path: "{{ images_dir }}"
-        owner: qemu
-        group: qemu
-        mode: '0755'
-        recurse: no
-
     - name: Copy generated config to mgmt_kvm
       copy:
         src: "{{ output_file }}"
         dest: "/var/lib/libvirt/config/vm_config/opnsense/config.xml"
         mode: '0644'
-
-    - name: Copy install script to mgmt_kvm
-      copy:
-        src: "/install/data/tasks/basekit/install_opnsense.sh"
-        dest: "/var/lib/libvirt/config/vm_config/opnsense/opnsense_install.sh"
-        mode: '0755'
-
-    - name: Grant qemu directory search via ACL (minimal exposure)
-      acl:
-        path: "{{ item }}"
-        entity: qemu
-        etype: user
-        permissions: x
-        state: present
-      loop: 
-        - "{{ images_dir }}"
-        - "{{ vm_config_dir }}"
-        - "{{ opnsense_dir }}"
 
     - name: Set SELinux file context for this nonstandard libvirt path
       community.general.sefcontext:

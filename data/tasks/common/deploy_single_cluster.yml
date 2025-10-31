@@ -56,7 +56,7 @@
 
 - name: Copy cluster deployment YAML to host
   copy:
-    src: "{{ env_dir }}/generated_files/{{ cluster_vars.deployment_yaml }}""
+    src: "{{ env_dir }}/generated_files/{{ cluster_vars.deployment_yaml }}"
     dest: /tmp
 
 - name: Apply cluster deployment YAML if cluster doesn't exist

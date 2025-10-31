@@ -19,10 +19,12 @@
       - { name: lv_root, percent: 100, mount: / }
 
   tasks:
-    - name: Pause to fix partition
+    - name: Fix partition (press Enter to continue)
       pause:
-        seconds: 300
-        prompt: "Fix the drive partition NOW — waiting up to 5 minutes.\nPress Enter to continue early."
+        prompt: |
+          Fix the drive partition NOW.
+          Press Enter when done.
+
 
 
     - name: Check if partition exists

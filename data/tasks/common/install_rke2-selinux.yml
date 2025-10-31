@@ -23,4 +23,7 @@
       loop: "{{ rpm_local_list }}"
 
     - name: Install the copied RPM(s)
-      command: rpm -ivh "{{ rpm_local_list | map('basename') | map('regex_replace', '^(.*)$', '/tmp/\\1') | list }}"
+      yum:
+        name: "{{ rpm_local_list | map('basename') | map('regex_replace', '^(.*)$', '/tmp/\\1') | list }}"
+        state: present
+        disable_gpg_check: true

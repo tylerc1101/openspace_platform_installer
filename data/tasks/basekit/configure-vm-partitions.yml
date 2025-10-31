@@ -1,6 +1,6 @@
 ---
 - name: Expand disk partition and logical volumes
-  hosts: "{{ target_hosts }}"
+  hosts: "{{ target_hosts }}:!openspace_data_cluster"
   become: yes
   gather_facts: yes
   
@@ -21,8 +21,9 @@
   tasks:
     - name: Pause to fix partition
       pause:
-        minutes: 5
-        prompt: "Waiting 5 minutes, go FIX the drive partition.....Press Enter to continue early"
+        seconds: 300
+        prompt: "Fix the drive partition NOW — waiting up to 5 minutes.\nPress Enter to continue early."
+
 
     - name: Check if partition exists
       shell: "parted {{ disk_device }} print 2>/dev/null | grep '^ {{ partition_number }}' || echo 'NOTFOUND'"

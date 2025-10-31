@@ -35,7 +35,7 @@ all:
         # ===========================================================
        
         # Domain used across the environment (used in DNS, certs, etc.)
-        domain_name: "base-kit.kratos"
+        domain_name: "base-kit-2.kratos"
 
         # Customer Network - WAN/External network info
         customer_network:
@@ -57,7 +57,7 @@ all:
         # List of clusters to deploy - Taken from below
         clusters_to_deploy:
           - osms_production
-        #  - osdc_production
+          - osdc_production
 
       # =============================================================
       #  Standalone / Utility Hosts
@@ -128,7 +128,7 @@ all:
                       vars:
                         cluster_name: "osms"
                         cluster_ssh_key: "osms_ssh_key"
-                        deployment_yaml: "/install/data/files/osms_deployment.yml"
+                        deployment_yaml: "osms_deployment.yml"
                       hosts:
                         osms1:
                           ansible_host: 192.168.2.9
@@ -147,10 +147,10 @@ all:
                         deployment_yaml: "/install/data/files/osdc_deployment.yml"
                       hosts:
                         osdc1: 
-                          ansible_host: 192.168.0.16
+                          ansible_host: 192.168.2.16
                           mgmt_interface: "enp1s0"
                           mac_address: "30:3E:A7:2E:3A:8B"
                         osdc2: 
-                          ansible_host: 192.168.0.17
+                          ansible_host: 192.168.2.17
                           mgmt_interface: "enp1s0"
                           mac_address: "30:3E:A7:2E:3A:8C"

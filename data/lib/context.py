@@ -15,11 +15,11 @@ class ExecutionContext:
     Reduces parameter passing and centralizes configuration.
     """
     # Directory paths
-    base_dir: Path = Path("/install")
-    data_dir: Path = Path("/install/data")
+    base_dir: Path = Path("/docker-workspace")
+    data_dir: Path = Path("/docker-workspace/data")
     env_dir: Path = Path("/docker-workspace/config")
-    images_dir: Path = Path("/install/images")
-    log_dir: Path = Path("/install/logs")
+    images_dir: Path = Path("/docker-workspace/images")
+    #log_dir: Path = None  # Will be set to <env>/.cache/logs
     
     # Environment configuration
     env_name: str = ""
@@ -37,8 +37,8 @@ class ExecutionContext:
     
     @property
     def state_file(self) -> Path:
-        """Path to the state file."""
-        return self.log_dir / "state.json"
+        """Path to the state file (in .cache directory)."""
+        return self.env_path / ".cache" / "state.json"
     
     @property
     def env_path(self) -> Path:

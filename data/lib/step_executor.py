@@ -170,7 +170,7 @@ class StepExecutor:
         
         # Create log file
         safe_desc = description.replace(" ", "_").replace("/", "-").replace("(", "").replace(")", "")
-        log_file = self.ctx.log_dir / f"{step_id}{suffix}-{safe_desc}.log"
+        log_file = self.ctx.log_path / f"{step_id}{suffix}-{safe_desc}.log"
         
         # Print step header
         print()  # Blank line
@@ -203,14 +203,14 @@ class StepExecutor:
         if exit_code == 0:
             self.logger.info("✅ SUCCESS")
             self.logger.info("")
-            self.state_mgr.mark_success(state_key, exit_code)
+            self.state_mgr.mark_success(state_key)
             return True
         else:
             self.logger.error("❌ FAILED")
             self.logger.error(f"Exit code: {exit_code}")
             self.logger.error(f"Log: {log_file}")
             self.logger.error("")
-            self.state_mgr.mark_failed(state_key, exit_code)
+            self.state_mgr.mark_failed(state_key)
             
             if on_failure == "continue":
                 self.logger.warning("⚠️  Continuing despite failure")

@@ -1,5 +1,6 @@
 """
 State file management for tracking installation progress.
+Simplified format without exit codes.
 """
 
 import json
@@ -12,10 +13,11 @@ class StateManager:
     """
     Manages state persistence for deployment progress.
     Tracks which steps have completed, failed, or are running.
+    Simplified format: just status, no exit codes.
     
     Example:
-        >>> state = StateManager(Path("/var/log/state.json"), Path("/var/log"))
-        >>> state.mark_running("step1", log="/var/log/step1.log")
+        >>> state = StateManager(Path("/config/prod/.cache/state.json"), Path("/config/prod/.cache/logs"))
+        >>> state.mark_running("step1", log="/config/prod/.cache/logs/step1.log")
         >>> state.mark_success("step1")
         >>> if state.is_completed("step1"):
         ...     print("Step already done!")
@@ -26,7 +28,7 @@ class StateManager:
         Initialize the state manager.
         
         Args:
-            state_file: Path to the JSON state file
+            state_file: Path to the JSON state file (in .cache directory)
             log_dir: Directory for logs
             logger: Optional logger for messages
         """
@@ -47,7 +49,7 @@ class StateManager:
     
     def save(self) -> None:
         """Save progress to the state file."""
-        self.log_dir.mkdir(parents=True, exist_ok=True)
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
         try:
             with open(self.state_file, 'w') as f:
                 json.dump(self.state, f, indent=2)
@@ -81,30 +83,26 @@ class StateManager:
         self.state["steps"][step_id] = {"status": "running", **kwargs}
         self.save()
     
-    def mark_success(self, step_id: str, exit_code: int = 0) -> None:
+    def mark_success(self, step_id: str) -> None:
         """
         Mark a step as successfully completed.
         
         Args:
             step_id: Step identifier
-            exit_code: Exit code (default 0)
         """
         if step_id in self.state["steps"]:
             self.state["steps"][step_id]["status"] = "ok"
-            self.state["steps"][step_id]["exit_code"] = exit_code
         self.save()
     
-    def mark_failed(self, step_id: str, exit_code: int) -> None:
+    def mark_failed(self, step_id: str) -> None:
         """
         Mark a step as failed.
         
         Args:
             step_id: Step identifier
-            exit_code: Non-zero exit code
         """
         if step_id in self.state["steps"]:
             self.state["steps"][step_id]["status"] = "failed"
-            self.state["steps"][step_id]["exit_code"] = exit_code
         self.save()
     
     def mark_skipped(self, step_id: str, reason: str = "") -> None:

@@ -4,6 +4,7 @@ Command building and execution.
 
 import logging
 import os
+import shutil
 import subprocess
 from pathlib import Path
 from typing import Dict, Any, List, Optional
@@ -184,13 +185,18 @@ def run_command(
         ...     timeout=300
         ... )
     """
-    ctx.log_dir.mkdir(parents=True, exist_ok=True)
+    ctx.log_path.mkdir(parents=True, exist_ok=True)
     
     ctx.logger.info(f"Running: {' '.join(command)}")
     
-    # Set up environment for ansible
+    # Set up environment
     env = os.environ.copy()
-    env["ANSIBLE_CONFIG"] = str(ctx.data_dir / "ansible.cfg")
+    
+    # Only set ansible config for ansible-playbook commands
+    # This doesn't affect parent process or other processes
+    if command[0] == "ansible-playbook":
+        env["ANSIBLE_CONFIG"] = str(ctx.data_dir / "ansible.cfg")
+    
     env["ANSIBLE_HOST_KEY_CHECKING"] = "False"
     env["ANSIBLE_SSH_RETRIES"] = "3"
     env["PYTHONUNBUFFERED"] = "1"

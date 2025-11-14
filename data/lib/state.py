@@ -78,9 +78,9 @@ class StateManager:
         
         Args:
             step_id: Step identifier
-            **kwargs: Additional metadata (log path, description, etc.)
+            **kwargs: Additional metadata (ignored - for backwards compatibility)
         """
-        self.state["steps"][step_id] = {"status": "running", **kwargs}
+        self.state["steps"][step_id] = {"status": "running"}
         self.save()
     
     def mark_success(self, step_id: str) -> None:

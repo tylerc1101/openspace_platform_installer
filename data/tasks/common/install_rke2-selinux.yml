@@ -2,7 +2,7 @@
   hosts: "{{ target_hosts }}"
   become: true
   vars:
-    rpm_local_glob: "/install/images/rke2-selinux-*.rpm"
+    rpm_local_glob: "/docker-workspace/images/rke2-selinux-*.rpm"
   tasks:
     - name: Expand local RPM path(s)
       set_fact:

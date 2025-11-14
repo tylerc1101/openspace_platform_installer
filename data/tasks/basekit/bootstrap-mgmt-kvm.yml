@@ -98,7 +98,7 @@
 
     - name: Create repo file
       copy:
-        src: /install/data/files/kratos.repo
+        src: /docker-workspace/data/files/kratos.repo
         dest: /etc/yum.repos.d/kratos.repo
         owner: root
         group: root

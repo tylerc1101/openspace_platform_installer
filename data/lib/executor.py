@@ -92,7 +92,7 @@ def build_command(
     Example:
         >>> cmd = build_command(
         ...     {'kind': 'ansible', 'file': 'setup.yml'},
-        ...     Path('/install/data/tasks/setup.yml'),
+        ...     Path('data/tasks/setup.yml'),
         ...     ctx,
         ...     ['-v']
         ... )

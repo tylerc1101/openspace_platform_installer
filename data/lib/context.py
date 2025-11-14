@@ -19,7 +19,7 @@ class ExecutionContext:
     data_dir: Path = Path("/docker-workspace/data")
     env_dir: Path = Path("/docker-workspace/config")
     images_dir: Path = Path("/docker-workspace/images")
-    #log_dir: Path = None  # Will be set to <env>/.cache/logs
+    log_dir: Path = field(default=None)
     
     # Environment configuration
     env_name: str = ""
@@ -44,6 +44,18 @@ class ExecutionContext:
     def env_path(self) -> Path:
         """Path to the environment directory."""
         return self.env_dir / self.env_name
+    
+    @property
+    def cache_dir(self) -> Path:
+        """Path to the .cache directory."""
+        return self.env_path / ".cache"
+    
+    @property
+    def log_path(self) -> Path:
+        """Path to the logs directory (derived from env_name if log_dir not set)."""
+        if self.log_dir:
+            return self.log_dir
+        return self.cache_dir / "logs"
     
     def __post_init__(self):
         """Validate required fields after initialization."""

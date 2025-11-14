@@ -4,7 +4,7 @@
   
   vars:
     env_name: "{{ env_name | mandatory }}"
-    template_file: "/install/data/templates/opnsense/config_template.xml"
+    template_file: "/docker-workspace/data/templates/opnsense/config_template.xml"
     output_dir: "/docker-workspace/config/{{ env_name }}/generated_files"
     output_file: "{{ output_dir }}/config.xml"
     wan_ip: "{{ hostvars['opnsense'].wan_ip }}"

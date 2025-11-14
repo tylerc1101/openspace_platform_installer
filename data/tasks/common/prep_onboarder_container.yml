@@ -32,7 +32,7 @@
     # b) Modify Makefiles
     - name: Deploy Makefile
       template:
-        src: /install/data/templates/basekit_makefile.j2
+        src: /docker-workspace/data/templates/basekit_makefile.j2
         dest: "{{ env_dir }}/Makefile"
         owner: root
         group: root
@@ -52,7 +52,7 @@
     # c) Create terraform state file
     - name: Create vm-terraform.tfstate inside container
       template:
-        src: /install/data/templates/basekit_vm-terraform.tfstate.j2
+        src: /docker-workspace/data/templates/basekit_vm-terraform.tfstate.j2
         dest: "{{ cache_dir }}/vm-terraform.tfstate"
         owner: root
         group: root

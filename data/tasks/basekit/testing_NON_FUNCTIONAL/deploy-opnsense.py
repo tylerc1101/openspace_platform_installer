@@ -67,7 +67,7 @@ def deploy_opnsense_vm():
     log("Deploying OPNsense VM...")
     
     # Check if install script exists
-    install_script = Path("/install/images/base-kit-1.0.1/scripts/install_opnsense.sh")
+    install_script = Path("/docker-workspace/images/base-kit-1.0.1/scripts/install_opnsense.sh")
     
     if not install_script.exists():
         log(f"⚠️  Install script not found at: {install_script}")

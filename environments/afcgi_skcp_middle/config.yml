@@ -144,7 +144,7 @@ all:
                       vars:
                         cluster_name: "osdc"
                         cluster_ssh_key: "osdc_ssh_key"
-                        deployment_yaml: "/install/data/files/osdc_deployment.yml"
+                        deployment_yaml: "/docker-workspace/data/files/osdc_deployment.yml"
                       hosts:
                         osdc1: 
                           ansible_host: 192.168.2.16

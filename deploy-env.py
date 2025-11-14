@@ -18,7 +18,6 @@ from data.lib import (
 from data.lib.config import setup_logging, load_yaml_file
 from data.lib.context import ExecutionContext
 from data.lib.exceptions import DeploymentError, ConfigurationError, ValidationError
-from data.lib.installer import install_rpms
 from data.lib.state import StateManager
 from data.lib.step_executor import StepExecutor
 from data.lib.validator import validate_deployment
@@ -301,11 +300,6 @@ def main():
         if args.validate_only:
             logger.info("\n✅ Validation complete. Exiting (--validate-only mode)")
             return EXIT_SUCCESS
-        
-        # Install RPMs before running steps
-        if not install_rpms(ctx):
-            logger.error("Failed to install required RPMs")
-            return EXIT_CONFIG_ERROR
         
         # Extract steps
         steps = deployment_data.get("steps", [])

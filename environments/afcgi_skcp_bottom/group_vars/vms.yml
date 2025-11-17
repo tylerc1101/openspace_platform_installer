@@ -1,0 +1,119 @@
+opnsense_cfg:
+  # Basic settings
+  hostname: "opnsense"
+  timezone: "Etc/UTC"
+  webgui_port: "8443"
+  
+  # Interface mapping
+  wan_interface: "vtnet1"
+  lan_interface: "vtnet0"
+  opt1_interface: "vtnet2"
+  
+  # WAN IP (can be overridden in host_vars)
+  wan_ip: "{{ hostvars['opnsense'].wan_ip }}"
+
+  # Port forwarding rules
+  port_forwards:
+    - descr: "MCM Port Forward"
+      target: "{{ opnsense_cfg.vips.mcm_wildcard }}"
+      local_port: "443"
+      wan_port: "5443"
+      protocol: "tcp"
+      
+    - descr: "OSMS Port Forward"
+      target: "{{ opnsense_cfg.vips.osms }}"
+      local_port: "443"
+      wan_port: "443"
+      protocol: "tcp"
+      
+    - descr: "OSDC1 BMC Port Forward"
+      target: "192.168.0.6"
+      local_port: "443"
+      wan_port: "5444"
+      protocol: "tcp"
+      
+    - descr: "OSDC2 BMC Port Forward"
+      target: "192.168.0.7"
+      local_port: "443"
+      wan_port: "5445"
+      protocol: "tcp"
+      
+    - descr: "3rd Party Server BMC Port Forward"
+      target: "192.168.0.8"
+      local_port: "443"
+      wan_port: "5446"
+      protocol: "tcp"
+      
+    - descr: "SpectralNet Wideband Card 1 Management Port Forward"
+      target: "192.168.0.9"
+      local_port: "80"
+      wan_port: "5447"
+      protocol: "tcp"
+      
+    - descr: "SpectralNet Wideband Card 2 Management Port Forward"
+      target: "192.168.0.10"
+      local_port: "80"
+      wan_port: "5448"
+      protocol: "tcp"
+
+  # DHCP static mappings
+  dhcp_static_maps:
+    - mac: "aa:aa:aa:aa:aa:aa"
+      ip: "{{ hostvars['osdc1'].ansible_host }}"
+      hostname: "osdc-1"
+      description: "OSDC 1"
+      gateway: "{{ mgmt_network.gateway }}"
+      dns: "{{ mgmt_network.gateway }}"
+
+  # DNS host overrides
+  dns_hosts:
+    - hostname: "mgmt-kvm"
+      ip: "{{ hostvars['mgmt_kvm'].mgmt_address }}"
+      description: "Management Server (Hypervisor)"
+      
+    - hostname: "onboarder"
+      ip: "{{ hostvars['onboarder'].ansible_host }}"
+      description: "Management - Onboarder VM"
+      
+    - hostname: "mcm-1"
+      ip: "{{ hostvars['mcm'].ansible_host }}"
+      description: "Management - MCM VM"
+      
+    - hostname: "osms-1"
+      ip: "{{ hostvars['osms'].ansible_host }}"
+      description: "Management - OSMS VM"
+      
+    - hostname: "osdc-1"
+      ip: "{{ hostvars['osdc1'].ansible_host }}"
+      description: "OSDC-1"
+      
+    - hostname: "osdc-2"
+      ip: "{{ hostvars['osdc2'].ansible_host }}"
+      description: "OSDC-2"
+      
+    - hostname: "osdc"
+      ip: "{{ opnsense_cfg.vips.osdc }}"
+      description: "OSDC VIP"
+      
+    - hostname: "osms"
+      ip: "{{ opnsense_cfg.vips.osms }}"
+      description: "OSMS VIP"
+      
+    - hostname: "api-osdc"
+      ip: "{{ opnsense_cfg.vips.api_osdc }}"
+      description: "OSDC API VIP"
+      
+    - hostname: "api-osms"
+      ip: "{{ opnsense_cfg.vips.api_osms }}"
+      description: "OSMS API VIP"
+      
+    - hostname: "api-mcm"
+      ip: "{{ opnsense_cfg.vips.api_mcm }}"
+      description: "MCM API VIP"
+  
+  # DNS wildcard entries
+  dns_wildcards:
+    - hostname: "*"
+      domain: "mcm.{{ domain_name }}"
+      ip: "{{ opnsense_cfg.vips.mcm_wildcard }}"
+      description: "MCM Wildcard VIP"

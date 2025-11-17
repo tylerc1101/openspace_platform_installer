@@ -1,0 +1,34 @@
+# group_vars/basekit.yml
+# All configuration for this environment's basekit deployment
+
+# Profile configuration
+deployment_type: "basekit"                 # Which deployment type: basekit, baremetal, aws
+deployment_plan: "federal_default"         # Which deployment plan to use: default, minimal, custom, etc.
+
+# Image references (used by profile requirements validation)
+onboarder: "onboarder-full_v3.6.0-rc4.tar.gz"
+basekit: "base-kit-1.0.1"
+osms: "openspace-1.9.0-295.os-app"
+
+# Virtual IP addresses
+vips:
+  osdc: "{{ mgmt_network.network }}.249"
+  osms: "{{ mgmt_network.network }}.250"
+  api_osdc: "{{ mgmt_network.network }}.251"
+  api_osms: "{{ mgmt_network.network }}.252"
+  api_mcm: "{{ mgmt_network.network }}.253"
+  mcm_wildcard: "{{ mgmt_network.network }}.254"
+
+# Optional: Override specific steps behavior
+step_overrides:
+  # You can disable specific steps
+  # deploy_opnsense:
+  #   enabled: false
+  
+  # Or override timeouts
+  # bootstrap_mgmt_kvm:
+  #   timeout: 3600
+  
+  # Or change failure behavior
+  # deploy_vms:
+  #   on_failure: continue

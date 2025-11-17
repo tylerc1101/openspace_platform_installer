@@ -243,7 +243,7 @@ def run_interactive_shell(
             "-it",   # Interactive with TTY
             "-v", f"{DATA_DIR}:/docker-workspace/data:{selinux_opt}",
             "-v", f"{IMAGES_DIR}:/docker-workspace/images:{selinux_opt}",
-            "-v", f"{ENVIRONMENTS_DIR}:/docker-workspace/config:{selinux_opt}",
+            "-v", f"{ENVIRONMENTS_DIR}:/docker-workspace/environments:{selinux_opt}",
             "-v", f"{SCRIPT_DIR}/deploy-env.py:/docker-workspace/deploy-env.py:{selinux_opt}",
             "-w", "/docker-workspace",
             image_ref,

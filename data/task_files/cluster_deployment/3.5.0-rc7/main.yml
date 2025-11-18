@@ -1,0 +1,26 @@
+version: '3'
+
+tasks:
+  prep-cluster-nodes:
+    desc: Prepare Cluster Nodes for Deployment
+    vars:
+      HOSTS: downstream_clusters
+      FILE: tasks/common/prep_cluster_nodes.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=prep-cluster-nodes --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  deploy-clusters:
+    desc: Deploy OpenSpace Clusters
+    vars:
+      HOSTS: mcm1
+      FILE: tasks/common/deploy_clusters.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-clusters --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  deploy-all:
+    desc: Run All Cluster Deployment Tasks
+    cmds:
+      - task: prep-cluster-nodes
+      - task: deploy-clusters

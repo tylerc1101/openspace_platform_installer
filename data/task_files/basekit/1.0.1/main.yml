@@ -1,0 +1,80 @@
+version: '3'
+
+tasks:
+  copy-ssh-key-mgmt:
+    desc: Copy SSH Key to Management KVM
+    vars:
+      HOSTS: mgmt_kvm
+      FILE: tasks/common/copy_ssh_key.yml
+      KIND: ansible
+      ARGS: "-e ssh_pubkey_path=/docker-workspace/config/{{.ENV}}/.ssh/onboarder_ssh_key.pub"
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=copy-ssh-key-mgmt --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}} --args="{{.ARGS}}"
+
+  bootstrap-mgmt-kvm:
+    desc: Bootstrap Management KVM Server
+    vars:
+      HOSTS: mgmt_kvm
+      FILE: tasks/basekit/bootstrap-mgmt-kvm.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=bootstrap-mgmt-kvm --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  configure-opnsense:
+    desc: Generate OPNsense Configuration
+    vars:
+      HOSTS: localhost
+      FILE: tasks/basekit/configure-opnsense.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=configure-opnsense --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  copy-opnsense-config:
+    desc: Copy OPNsense Config to Management KVM
+    vars:
+      HOSTS: mgmt_kvm
+      FILE: tasks/basekit/copy-opnsense-config.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=copy-opnsense-config --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  deploy-opnsense-vm:
+    desc: Deploy OPNsense VM
+    vars:
+      HOSTS: localhost
+      KIND: shell
+      COMMAND: |
+        MGMT_USER=$(grep ansible_user config/{{.ENV}}/config.yml | head -1 | awk -F': ' '{print $2}')
+        MGMT_HOST=$(grep ansible_host config/{{.ENV}}/config.yml | grep mgmt_kvm -A1 | tail -1 | awk -F': ' '{print $2}')
+        ssh ${MGMT_USER}@${MGMT_HOST} 'sudo bash /var/lib/libvirt/config/vm_config/opnsense/install_opnsense.sh'
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-opnsense-vm --kind={{.KIND}} --command="{{.COMMAND}}"
+
+  deploy-vms:
+    desc: Deploy VMs on Management KVM
+    vars:
+      HOSTS: mgmt_kvm
+      FILE: tasks/basekit/deploy-vms.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-vms --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  configure-vm-partitions:
+    desc: Configure VM Disk Partitions
+    vars:
+      HOSTS: clusters
+      FILE: tasks/basekit/configure-vm-partitions.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=configure-vm-partitions --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  deploy-all:
+    desc: Deploy All Basekit Components
+    cmds:
+      - task: copy-ssh-key-mgmt
+      - task: bootstrap-mgmt-kvm
+      - task: configure-opnsense
+      - task: copy-opnsense-config
+      - task: deploy-opnsense-vm
+      - task: deploy-vms
+      - task: configure-vm-partitions

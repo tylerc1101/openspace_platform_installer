@@ -1,0 +1,37 @@
+version: '3'
+
+tasks:
+  copy-ssh-key-mcm:
+    desc: Copy SSH Key to MCM Nodes
+    vars:
+      HOSTS: infrastructure_cluster
+      FILE: tasks/common/copy_ssh_key.yml
+      KIND: ansible
+      ARGS: "-e ssh_pubkey_path=/docker-workspace/config/{{.ENV}}/.ssh/rancher_ssh_key.pub"
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=copy-ssh-key-mcm --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}} --args="{{.ARGS}}"
+
+  node-prep:
+    desc: Cluster Node Prep
+    vars:
+      HOSTS: clusters
+      FILE: tasks/common/configure-node.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=configure-node --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  install-rke2-selinux:
+    desc: Install RKE2 SELinux Package
+    vars:
+      HOSTS: clusters
+      FILE: tasks/common/install_rke2-selinux.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=install-rke2-selinux --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  deploy-all:
+    desc: Run All Node Prep Tasks
+    cmds:
+      - task: copy-ssh-key-mcm
+      - task: node-prep
+      - task: install-rke2-selinux

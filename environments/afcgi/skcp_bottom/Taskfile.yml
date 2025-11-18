@@ -1,123 +1,127 @@
 version: '3'
 
 vars:
-  ENV: skcp_bottom
+  ENV: afcgi/skcp_bottom
   DATA_DIR: /docker-workspace/data
   ENV_DIR: /docker-workspace/config/{{.ENV}}
-  TASK_FILES_DIR: '{{.DATA_DIR}}/task_files'
   TASK_DIR: '{{.DATA_DIR}}/tasks'
 
   DEPLOYMENT_TYPE: basekit
   DEPLOYMENT_VERSION: 1.0.1
+  DEPLOYMENT_PLAN: main.yml
 
   ONBOARDER_VERSION: 3.5.0-rc7
-  OS: Rhel9
+  ONBOARDER_PLAN: main.yml
+  
+  NODE_PREP_PLAN: rhel9.yml
+
+  OSMS_DEPLOYMENT_PLAN: main.yml
+  OSDC_DEPLOYMENT_PLAN: main.yml
 
 includes:
   deployment:
-    taskfile: '{{.TASK_FILES_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/default.yml'
+    taskfile: '{{.DATA_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/{{.DEPLOYMENT_PLAN}}'
     vars:
       ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
       ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
   onboarder:
-    taskfile: '{{.TASK_FILES_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/default.yml'
+    taskfile: '{{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/{{.ONBOARDER_PLAN}}'
     vars:
       ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
       ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
   node_prep:
-    taskfile: '{{.TASK_FILES_DIR}}/node_prep/{{.ONBOARDER_VERSION}}/{{.OS}}/default.yml'
+    taskfile: '{{.DATA_DIR}}/node_prep/{{.ONBOARDER_VERSION}}/{{.NODE_PREP_PLAN}}'
     vars:
       ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
       ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
-  cluster_deployment:
-    taskfile: '{{.TASK_FILES_DIR}}/cluster_deployment/{{.ONBOARDER_VERSION}}/default.yml'
+  
+  ### NEED TO WORK THE CLUSTER DEPLOYMENT INTO HERE ###
+  osms_deployment:
+    taskfile: '{{.DATA_DIR}}/cluster_deployment/{{.ONBOARDER_VERSION}}/{{.OSMS_DEPLOYMENT_PLAN}}'
+    vars:
+      ENV: '{{.ENV}}'
+      DATA_DIR: '{{.DATA_DIR}}'
+      ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
+  osdc_deployment:
+    taskfile: '{{.DATA_DIR}}/cluster_deployment/{{.ONBOARDER_VERSION}}/{{.OSDC_DEPLOYMENT_PLAN}}'
     vars:
       ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
       ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
 
 tasks:
-  # Phase 1: Common Setup Tasks
+  # Phase 1: Prep
   prep-onboarder-container:
     desc: Prep Onboarder Container
     cmds:
       - task: onboarder:prep-onboarder-container
 
-  # Phase 2: Deployment Setup From Deployment Version File
   run-deployment-setup:
     desc: Run Deployment Setup Tasks
     cmds:
       - task: deployment:deploy-all
 
-  # Phase 3: Cluster node prep
+  # Phase 2: Deploy Infrastructure (MCM)
   node_prep:
-    desc: Run Cluster Node Preparation Tasks
+    desc: Run Node Preparation Tasks
+    vars:
+      HOSTS: infrastructure_cluster
     cmds:
       - task: node_prep:deploy-all
 
-  # Phase 4: Run Onboarder
   run-onboarder:
     desc: Run Complete Onboarder Deployment
     cmds:
       - task: onboarder:deploy-all
 
-  # Phase 5: Cluster Deployment
-  deploy-clusters:
-    desc: Deploy OpenSpace Clusters
+  # Phase 3: Cluster Deployment
+  cluster_node_prep:
+    desc: Run Cluster Node Preparation Tasks
+    cmds:
+      - task: node_prep:deploy-all
+
+  deploy-cluster:
+    desc: Deploy OpenSpace Cluster
     cmds:
       - task: cluster_deployment:deploy-all
 
   # Phase #: Post Install Tasks
-  write-version-manifest:
-    desc: Write Version Manifest
-    cmds:
-      - |
-        MANIFEST_FILE="{{.ENV_DIR}}/version_manifest.yml"
-        echo "environment: {{.ENV}}" > $MANIFEST_FILE
-        echo "basekit_version: {{.BASEKIT_VERSION}}" >> $MANIFEST_FILE
-        echo "onboarder_version: {{.ONBOARDER_VERSION}}" >> $MANIFEST_FILE
-        echo "node_prep_version: {{.NODE_PREP_VERSION}}" >> $MANIFEST_FILE
-        echo "cluster_deployment_version: {{.CLUSTER_DEPLOYMENT_VERSION}}" >> $MANIFEST_FILE
-        echo "Version manifest written to $MANIFEST_FILE"
 
   # Full Deployment Workflow
-  deploy:
-    desc: Complete environment deployment workflow
-    summary: |
-      Runs the full deployment workflow for the {{.ENV}} environment using
-      pinned, versioned Taskfiles so the install can be reproduced later.
-
-      Component versions:
-        - Basekit deployment:         {{.BASEKIT_VERSION}}
-        - Onboarder:                  {{.ONBOARDER_VERSION}}
-        - Node preparation:           {{.NODE_PREP_VERSION}}
-        - Cluster deployment:         {{.CLUSTER_DEPLOYMENT_VERSION}}
-
-      Execution phases:
-        1. Prep onboarder container
-           - Task: prep-onboarder-container (delegates to onboarder:prep-onboarder-container)
-
-        2. Run basekit / deployment setup
-           - Task: run-deployment-setup (delegates to deployment:deploy-all)
-
-        3. Run cluster node preparation
-           - Task: node_prep (delegates to node_prep:deploy-all)
-
-        4. Run complete onboarder deployment
-           - Task: run-onboarder (delegates to onboarder:deploy-all)
-
-        5. Deploy OpenSpace clusters
-           - Task: deploy-clusters (delegates to cluster_deployment:deploy-all)
+  prep:
+    desc: Complete environment preparation workflow
     cmds:
       - task: prep-onboarder-container
       - task: run-deployment-setup
+
+  deploy-mcm:
+    desc: Complete environment deployment workflow
+    vars:
+      HOSTS: infrastructure_cluster
+      ARGS: "-e ssh_pubkey_path=/docker-workspace/environments/{{.ENV}}/.ssh/rancher_ssh_key.pub"
+    cmds:
+      - task: copy-ssh-key
       - task: node_prep
       - task: run-onboarder
-      - task: deploy-clusters
-      - task: write-version-manifest
+
+  deploy-osms:
+    desc: Complete OSMS deployment workflow
+    vars:
+      HOSTS: openspace_management_cluster
+    cmds:
+      - task: node_prep
+      - task: deploy-cluster
+
+  deploy-osdc:
+    desc: Complete OSDC deployment workflow
+    vars:
+      HOSTS: openspace_data_cluster
+    cmds:
+      - task: node_prep
+      - task: deploy-cluster
 
 
   resume:
@@ -126,6 +130,14 @@ tasks:
       - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --resume
 
   # Utility Tasks
+  copy-ssh-key:
+    desc: Copy SSH Key to Node
+    vars:
+      FILE: tasks/common/copy_ssh_key.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=copy-ssh-key --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}} --args="{{.ARGS}}"
+
   show-state:
     desc: Show current deployment state
     cmds:

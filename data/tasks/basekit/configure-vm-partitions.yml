@@ -29,7 +29,6 @@
       shell: "parted {{ disk_device }} print 2>/dev/null | grep '^ {{ partition_number }}' || echo 'NOTFOUND'"
       register: partition_check
       changed_when: false
-      failed_when: true
 
     - name: Debug partition check
       debug:

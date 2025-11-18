@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  ENV: afcgi_skcp_bottom
+  ENV: skcp_bottom
   DATA_DIR: /docker-workspace/data
   ENV_DIR: /docker-workspace/config/{{.ENV}}
   TASK_FILES_DIR: '{{.DATA_DIR}}/task_files'

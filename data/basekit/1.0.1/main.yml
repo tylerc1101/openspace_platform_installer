@@ -5,7 +5,7 @@ tasks:
     desc: Copy SSH Key to Management KVM
     vars:
       HOSTS: mgmt_kvm
-      FILE: '{{.DATA_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/tasks/copy_ssh_key.yml'
+      FILE: '{{.DATA_DIR}}/common/copy_ssh_key.yml'
       KIND: ansible
       ARGS: "-e ssh_pubkey_path=/docker-workspace/config/{{.ENV}}/.ssh/onboarder_ssh_key.pub"
     cmds:

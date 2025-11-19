@@ -20,6 +20,5 @@ tasks:
   deploy-all:
     desc: Run All Node Prep Tasks
     cmds:
-      - task: copy-ssh-key-mcm
       - task: node-prep
       - task: install-rke2-selinux

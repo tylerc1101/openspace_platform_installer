@@ -32,7 +32,7 @@
     # b) Modify Makefiles
     - name: Deploy Makefile
       template:
-        src: /docker-workspace/data/templates/basekit_makefile.j2
+        src: ../files/basekit_makefile.j2
         dest: "{{ env_dir }}/Makefile"
         owner: root
         group: root

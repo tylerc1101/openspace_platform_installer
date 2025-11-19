@@ -1,11 +1,9 @@
 version: '3'
 
 vars:
-  ENV: afcgi/skcp_bottom
   DATA_DIR: /docker-workspace/data
-  ENV_DIR: /docker-workspace/config/{{.ENV}}
-  TASK_DIR: '{{.DATA_DIR}}/tasks'
-
+  INSTALL_DIR: /docker-workspace/config/install
+  
   DEPLOYMENT_TYPE: basekit
   DEPLOYMENT_VERSION: 1.0.1
   DEPLOYMENT_PLAN: main.yml
@@ -14,33 +12,31 @@ vars:
   ONBOARDER_PLAN: main.yml
   
   NODE_PREP_PLAN: rhel9.yml
-
   CLUSTER_DEPLOYMENT_PLAN: main.yml
 
 includes:
   deployment:
     taskfile: '{{.DATA_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/{{.DEPLOYMENT_PLAN}}'
     vars:
-      ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
       DEPLOYMENT_TYPE: '{{.DEPLOYMENT_TYPE}}'
       DEPLOYMENT_VERSION: '{{.DEPLOYMENT_VERSION}}'
+  
   onboarder:
     taskfile: '{{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/{{.ONBOARDER_PLAN}}'
     vars:
-      ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
       ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
+  
   node-prep:
     taskfile: '{{.DATA_DIR}}/node_prep/{{.ONBOARDER_VERSION}}/{{.NODE_PREP_PLAN}}'
     vars:
-      ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
       ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
+  
   cluster-deployment:
     taskfile: '{{.DATA_DIR}}/cluster_deployment/{{.ONBOARDER_VERSION}}/{{.CLUSTER_DEPLOYMENT_PLAN}}'
     vars:
-      ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
       ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
 
@@ -99,7 +95,7 @@ tasks:
       - task: copy-ssh-key
         vars:
           HOSTS: '{{.HOSTS}}'
-          ARGS: '-e ssh_pubkey_path=/docker-workspace/config/{{.ENV}}/.ssh/rancher_ssh_key.pub'
+          ARGS: '-e ssh_pubkey_path=/docker-workspace/config/install/.ssh/rancher_ssh_key.pub'
       - task: run-node-prep
         vars:
           HOSTS: '{{.HOSTS}}'
@@ -113,7 +109,7 @@ tasks:
       - task: copy-ssh-key
         vars:
           HOSTS: '{{.HOSTS}}'
-          ARGS: '-e ssh_pubkey_path=/docker-workspace/config/{{.ENV}}/.ssh/production_ssh_key.pub'
+          ARGS: '-e ssh_pubkey_path=/docker-workspace/config/install/.ssh/production_ssh_key.pub'
       - task: run-node-prep
         vars:
           HOSTS: '{{.HOSTS}}'
@@ -132,7 +128,7 @@ tasks:
       - task: copy-ssh-key
         vars:
           HOSTS: '{{.HOSTS}}'
-          ARGS: '-e ssh_pubkey_path=/docker-workspace/config/{{.ENV}}/.ssh/production_ssh_key.pub'
+          ARGS: '-e ssh_pubkey_path=/docker-workspace/config/install/.ssh/production_ssh_key.pub'
       - task: run-node-prep
         vars:
           HOSTS: '{{.HOSTS}}'
@@ -150,39 +146,39 @@ tasks:
       FILE: '{{.DATA_DIR}}/common/copy_ssh_key.yml'
       KIND: ansible
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=copy-ssh-key --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}} --args="{{.ARGS}}"
+      - python3 {{.DATA_DIR}}/run_task.py --task-id=copy-ssh-key --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}} --args="{{.ARGS}}"
 
   resume:
     desc: Resume deployment from last state
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --resume
+      - python3 {{.DATA_DIR}}/run_task.py --resume
 
   show-state:
     desc: Show current deployment state
     cmds:
       - |
-        STATE_FILE="config/{{.ENV}}/.cache/state.json"
+        STATE_FILE="/docker-workspace/config/install/.cache/state.json"
         if [ -f "$STATE_FILE" ]; then
           cat "$STATE_FILE" | python3 -m json.tool
         else
-          echo "No state file found for {{.ENV}}"
+          echo "No state file found"
         fi
 
   clean-state:
     desc: Clean deployment state (start fresh)
-    prompt: This will delete the state file for {{.ENV}}. Continue?
+    prompt: This will delete the state file. Continue?
     cmds:
-      - rm -f config/{{.ENV}}/.cache/state.json
-      - echo "State cleared for {{.ENV}}"
+      - rm -f /docker-workspace/config/install/.cache/state.json
+      - echo "State cleared"
 
   logs:
     desc: List recent task logs
     cmds:
-      - ls -lt config/{{.ENV}}/.cache/logs/ | head -10
+      - ls -lt /docker-workspace/config/install/.cache/logs/ | head -10
 
   tail-log:
     desc: Tail a specific task log
     requires:
       vars: [TASK_ID]
     cmds:
-      - tail -f config/{{.ENV}}/.cache/logs/{{.TASK_ID}}.log
+      - tail -f /docker-workspace/config/install/.cache/logs/{{.TASK_ID}}.log

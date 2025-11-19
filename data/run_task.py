@@ -12,9 +12,9 @@ from typing import Dict, Any, Optional
 class StateManager:
     """Manages deployment state for resume capability"""
     
-    def __init__(self, env: str):
-        self.env = env
-        self.state_file = Path(f"config/{env}/.cache/state.json")
+    def __init__(self):
+        # Always use /docker-workspace/config/install
+        self.state_file = Path("/docker-workspace/config/install/.cache/state.json")
         self.state_file.parent.mkdir(parents=True, exist_ok=True)
         self.state = self._load_state()
     
@@ -68,12 +68,11 @@ class StateManager:
 class TaskLogger:
     """Handles logging for task execution"""
     
-    def __init__(self, env: str, task_id: str):
-        self.env = env
+    def __init__(self, task_id: str):
         self.task_id = task_id
         
-        # Setup log directory
-        log_dir = Path(f"config/{env}/.cache/logs")
+        # Setup log directory - always use install path
+        log_dir = Path("/docker-workspace/config/install/.cache/logs")
         log_dir.mkdir(parents=True, exist_ok=True)
         
         # Setup logger
@@ -112,11 +111,10 @@ class TaskLogger:
 class TaskExecutor:
     """Executes different types of tasks"""
     
-    def __init__(self, env: str, logger: TaskLogger):
-        self.env = env
+    def __init__(self, logger: TaskLogger):
         self.logger = logger
         self.data_dir = Path("/docker-workspace/data")
-        self.config_dir = Path(f"config/{env}")
+        self.install_dir = Path("/docker-workspace/config/install")
     
     def execute(self, task_id: str, kind: str, **kwargs):
         """Execute a task based on its kind"""
@@ -136,15 +134,15 @@ class TaskExecutor:
         env_vars['ANSIBLE_CONFIG'] = str(self.data_dir / 'ansible.cfg')
         
         # Build ansible-playbook command
-        inventory_path = self.config_dir / "config.yml"
-        playbook_path = self.data_dir / file
+        inventory_path = self.install_dir / "config.yml"
+        playbook_path = Path(file)
         
         cmd = [
             'ansible-playbook',
             '-i', str(inventory_path),
             str(playbook_path),
             '-e', f'target_hosts={hosts}',
-            '-e', f'env_name={self.env}',
+            '-e', f'env_name=install',  # Always use 'install' as env name
         ]
         
         # Add additional args if provided
@@ -194,7 +192,6 @@ class TaskExecutor:
 
 def main():
     parser = argparse.ArgumentParser(description='Run deployment tasks with state management')
-    parser.add_argument('--env', required=True, help='Environment name')
     parser.add_argument('--task-id', help='Task ID to execute')
     parser.add_argument('--kind', help='Task kind (ansible, shell)')
     parser.add_argument('--hosts', help='Target hosts for ansible')
@@ -205,8 +202,8 @@ def main():
     
     args = parser.parse_args()
     
-    # Initialize state manager
-    state = StateManager(args.env)
+    # Initialize state manager (no env needed)
+    state = StateManager()
     
     # Handle resume
     if args.resume:
@@ -227,9 +224,9 @@ def main():
         print(f"Task {args.task_id} already completed, skipping...")
         return 0
     
-    # Initialize logger and executor
-    logger = TaskLogger(args.env, args.task_id)
-    executor = TaskExecutor(args.env, logger)
+    # Initialize logger and executor (no env needed)
+    logger = TaskLogger(args.task_id)
+    executor = TaskExecutor(logger)
     
     # Mark task as started
     state.mark_started(args.task_id)

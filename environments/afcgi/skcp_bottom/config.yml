@@ -11,26 +11,6 @@ all:
         ansible_become_pass: "kratos"
 
         # ===========================================================
-        #  Bastion Configuration
-        # ===========================================================
-        bastion_host: "{{ hostvars['mgmt_kvm']['ansible_host'] }}"
-        bastion_user: "{{ ansible_user }}"
-        bastion_pass: "{{ ansible_ssh_pass }}"
-
-        # ===========================================================
-        #  Deployment Configuration - See README for details
-        # ===========================================================
-        deployment_type: "basekit"                 # Which deployment type: basekit, baremetal, aws
-        deployment_plan: "federal_default"         # Which deployment plan to use: default, minimal, custom, etc.
-
-        # ===========================================================
-        #  Image References - File names for required images
-        # ===========================================================
-        onboarder: "onboarder-full.v3.5.0-rc7.tar.gz"
-        basekit: "base-kit-1.0.1"
-        osms: "openspace-1.9.0-295.os-app"
-
-        # ===========================================================
         #  Environment-Level Variables
         # ===========================================================
        
@@ -74,7 +54,6 @@ all:
         # -----------------------------------------------------------
         opnsense:
           wan_ip: "10.243.77.221"     # External IP for firewall management
-          # Add ansible_host if you plan to manage it directly via SSH
 
         # -----------------------------------------------------------
         # mgmt_kvm - Management hypervisor running OpenSpace VMs

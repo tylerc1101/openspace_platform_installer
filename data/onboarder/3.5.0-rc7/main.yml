@@ -1,0 +1,93 @@
+version: '3'
+
+tasks:
+  prep-onboarder-container:
+    desc: Prep Onboarder Container
+    vars:
+      HOSTS: localhost
+      FILE: '{{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/prep_onboarder_container.yml'
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=prep-onboarder-container --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  deploy-rke2-cluster:
+    desc: Deploy RKE2 Cluster
+    vars:
+      KIND: shell
+      COMMAND: cd /docker-workspace; make ansible-deploy-rke2-cluster ENVIRONMENT={{.ENV}}
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-rke2-cluster --kind={{.KIND}} --command="{{.COMMAND}}"
+
+  bootstrap-container-images:
+    desc: Bootstrap Container Images
+    vars:
+      KIND: shell
+      COMMAND: cd /docker-workspace; make bootstrap-container-images-run ENVIRONMENT={{.ENV}}
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=bootstrap-container-images --kind={{.KIND}} --command="{{.COMMAND}}"
+
+  deploy-harbor:
+    desc: Deploy Harbor Registry
+    vars:
+      KIND: shell
+      COMMAND: cd /docker-workspace; make helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={{.ENV}}
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-harbor --kind={{.KIND}} --command="{{.COMMAND}}"
+
+  load-darksite-bundles:
+    desc: Load Darksite Bundles
+    vars:
+      KIND: shell
+      COMMAND: cd /docker-workspace; make load-darksite-bundles ENVIRONMENT={{.ENV}}
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=load-darksite-bundles --kind={{.KIND}} --command="{{.COMMAND}}"
+
+  deploy-rancher:
+    desc: Deploy Rancher
+    vars:
+      KIND: shell
+      COMMAND: cd /docker-workspace; make helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={{.ENV}}
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-rancher --kind={{.KIND}} --command="{{.COMMAND}}"
+
+  terraform-rancher:
+    desc: Bootstrap Rancher with Terraform
+    vars:
+      KIND: shell
+      COMMAND: cd /docker-workspace; make terraform-rancher-bootstrap-apply ENVIRONMENT={{.ENV}}
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=terraform-rancher --kind={{.KIND}} --command="{{.COMMAND}}"
+
+  deploy-gitea:
+    desc: Deploy Gitea
+    vars:
+      KIND: shell
+      COMMAND: cd /docker-workspace; make install-gitea ENVIRONMENT={{.ENV}}
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-gitea --kind={{.KIND}} --command="{{.COMMAND}}"
+
+  deploy-argocd:
+    desc: Deploy ArgoCD
+    vars:
+      KIND: shell
+      COMMAND: cd /docker-workspace; make install-argocd ENVIRONMENT={{.ENV}}
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-argocd --kind={{.KIND}} --command="{{.COMMAND}}"
+
+  # The workflow that orchestrates all steps
+  deploy-all:
+    desc: Run all Onboarder deployment steps
+    cmds:
+      - task: deploy-rke2-cluster
+      - task: bootstrap-container-images
+      - task: deploy-harbor
+      - task: load-darksite-bundles
+      - task: deploy-rancher
+      - task: terraform-rancher
+      - task: deploy-gitea
+      - task: deploy-argocd
+
+  onboarder-prep:
+    desc: Prepare Onboarder Environment
+    cmds:
+      - task: prep-onboarder-container

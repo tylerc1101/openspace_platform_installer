@@ -1,0 +1,261 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import logging
+import os
+import subprocess
+import sys
+from pathlib import Path
+from datetime import datetime
+from typing import Dict, Any, Optional
+
+class StateManager:
+    """Manages deployment state for resume capability"""
+    
+    def __init__(self, env: str):
+        self.env = env
+        self.state_file = Path(f"config/{env}/.cache/state.json")
+        self.state_file.parent.mkdir(parents=True, exist_ok=True)
+        self.state = self._load_state()
+    
+    def _load_state(self) -> Dict[str, Any]:
+        """Load existing state or create new"""
+        if self.state_file.exists():
+            with open(self.state_file, 'r') as f:
+                return json.load(f)
+        return {
+            "tasks": {},
+            "last_run": None,
+            "status": "not_started"
+        }
+    
+    def _save_state(self):
+        """Persist state to disk"""
+        with open(self.state_file, 'w') as f:
+            json.dump(self.state, f, indent=2)
+    
+    def is_completed(self, task_id: str) -> bool:
+        """Check if task is already completed"""
+        return self.state["tasks"].get(task_id, {}).get("status") == "completed"
+    
+    def mark_started(self, task_id: str):
+        """Mark task as started"""
+        self.state["tasks"][task_id] = {
+            "status": "running",
+            "started_at": datetime.now().isoformat()
+        }
+        self.state["last_run"] = task_id
+        self._save_state()
+    
+    def mark_completed(self, task_id: str):
+        """Mark task as completed"""
+        self.state["tasks"][task_id]["status"] = "completed"
+        self.state["tasks"][task_id]["completed_at"] = datetime.now().isoformat()
+        self._save_state()
+    
+    def mark_failed(self, task_id: str, error: str):
+        """Mark task as failed"""
+        self.state["tasks"][task_id]["status"] = "failed"
+        self.state["tasks"][task_id]["error"] = error
+        self.state["tasks"][task_id]["failed_at"] = datetime.now().isoformat()
+        self._save_state()
+    
+    def get_last_incomplete_task(self) -> Optional[str]:
+        """Get the last task that wasn't completed"""
+        return self.state.get("last_run")
+
+
+class TaskLogger:
+    """Handles logging for task execution"""
+    
+    def __init__(self, env: str, task_id: str):
+        self.env = env
+        self.task_id = task_id
+        
+        # Setup log directory
+        log_dir = Path(f"config/{env}/.cache/logs")
+        log_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Setup logger
+        self.logger = logging.getLogger(f"task.{task_id}")
+        self.logger.setLevel(logging.INFO)
+        
+        # File handler for task-specific log
+        task_log = log_dir / f"{task_id}.log"
+        fh = logging.FileHandler(task_log)
+        fh.setLevel(logging.INFO)
+        
+        # Console handler
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.INFO)
+        
+        # Formatter
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        fh.setFormatter(formatter)
+        ch.setFormatter(formatter)
+        
+        self.logger.addHandler(fh)
+        self.logger.addHandler(ch)
+    
+    def info(self, msg: str):
+        self.logger.info(msg)
+    
+    def error(self, msg: str):
+        self.logger.error(msg)
+    
+    def warning(self, msg: str):
+        self.logger.warning(msg)
+
+
+class TaskExecutor:
+    """Executes different types of tasks"""
+    
+    def __init__(self, env: str, logger: TaskLogger):
+        self.env = env
+        self.logger = logger
+        self.data_dir = Path("/data")
+        self.config_dir = Path(f"config/{env}")
+    
+    def execute(self, task_id: str, kind: str, **kwargs):
+        """Execute a task based on its kind"""
+        self.logger.info(f"Executing task: {task_id} (kind: {kind})")
+        
+        if kind == "ansible":
+            return self._execute_ansible(task_id, **kwargs)
+        elif kind == "shell":
+            return self._execute_shell(task_id, **kwargs)
+        else:
+            raise ValueError(f"Unknown task kind: {kind}")
+    
+    def _execute_ansible(self, task_id: str, hosts: str, file: str, args: str = "", **kwargs):
+        """Execute an Ansible playbook"""
+        # Set environment variables for subprocess
+        env_vars = os.environ.copy()
+        env_vars['ANSIBLE_CONFIG'] = str(self.data_dir / 'ansible.cfg')
+        
+        # Build ansible-playbook command
+        inventory_path = self.config_dir / "config.yml"
+        playbook_path = self.data_dir / file
+        
+        cmd = [
+            'ansible-playbook',
+            '-i', str(inventory_path),
+            str(playbook_path),
+            '-e', f'target_hosts={hosts}',
+            '-e', f'env_name={self.env}',
+        ]
+        
+        # Add additional args if provided
+        if args:
+            cmd.extend(args.split())
+        
+        self.logger.info(f"Running: {' '.join(cmd)}")
+        
+        try:
+            result = subprocess.run(
+                cmd,
+                env=env_vars,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            self.logger.info(f"Task {task_id} completed successfully")
+            self.logger.info(result.stdout)
+            return True
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Task {task_id} failed with exit code {e.returncode}")
+            self.logger.error(e.stdout)
+            self.logger.error(e.stderr)
+            raise
+    
+    def _execute_shell(self, task_id: str, command: str, **kwargs):
+        """Execute a shell command"""
+        self.logger.info(f"Running shell command: {command}")
+        
+        try:
+            result = subprocess.run(
+                command,
+                shell=True,
+                check=True,
+                capture_output=True,
+                text=True
+            )
+            self.logger.info(f"Task {task_id} completed successfully")
+            self.logger.info(result.stdout)
+            return True
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Task {task_id} failed with exit code {e.returncode}")
+            self.logger.error(e.stdout)
+            self.logger.error(e.stderr)
+            raise
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Run deployment tasks with state management')
+    parser.add_argument('--env', required=True, help='Environment name')
+    parser.add_argument('--task-id', help='Task ID to execute')
+    parser.add_argument('--kind', help='Task kind (ansible, shell)')
+    parser.add_argument('--hosts', help='Target hosts for ansible')
+    parser.add_argument('--file', help='Ansible playbook file path')
+    parser.add_argument('--args', default='', help='Additional arguments')
+    parser.add_argument('--command', help='Shell command to execute')
+    parser.add_argument('--resume', action='store_true', help='Resume from last checkpoint')
+    
+    args = parser.parse_args()
+    
+    # Initialize state manager
+    state = StateManager(args.env)
+    
+    # Handle resume
+    if args.resume:
+        last_task = state.get_last_incomplete_task()
+        if not last_task:
+            print("No incomplete tasks to resume")
+            return 0
+        print(f"Cannot auto-resume - please run the failed task manually: {last_task}")
+        return 1
+    
+    # Validate task parameters
+    if not args.task_id:
+        print("Error: --task-id is required")
+        return 1
+    
+    # Check if already completed
+    if state.is_completed(args.task_id):
+        print(f"Task {args.task_id} already completed, skipping...")
+        return 0
+    
+    # Initialize logger and executor
+    logger = TaskLogger(args.env, args.task_id)
+    executor = TaskExecutor(args.env, logger)
+    
+    # Mark task as started
+    state.mark_started(args.task_id)
+    
+    try:
+        # Execute the task
+        executor.execute(
+            task_id=args.task_id,
+            kind=args.kind,
+            hosts=args.hosts,
+            file=args.file,
+            args=args.args,
+            command=args.command
+        )
+        
+        # Mark as completed
+        state.mark_completed(args.task_id)
+        logger.info(f"Task {args.task_id} completed successfully")
+        return 0
+        
+    except Exception as e:
+        # Mark as failed
+        state.mark_failed(args.task_id, str(e))
+        logger.error(f"Task {args.task_id} failed: {str(e)}")
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

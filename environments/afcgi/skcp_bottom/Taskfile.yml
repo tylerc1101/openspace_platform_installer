@@ -1,0 +1,168 @@
+version: '3'
+
+vars:
+  ENV: afcgi/skcp_bottom
+  DATA_DIR: /docker-workspace/data
+  ENV_DIR: /docker-workspace/config/{{.ENV}}
+  TASK_DIR: '{{.DATA_DIR}}/tasks'
+
+  DEPLOYMENT_TYPE: basekit
+  DEPLOYMENT_VERSION: 1.0.1
+  DEPLOYMENT_PLAN: main.yml
+
+  ONBOARDER_VERSION: 3.5.0-rc7
+  ONBOARDER_PLAN: main.yml
+  
+  NODE_PREP_PLAN: rhel9.yml
+
+  OSMS_DEPLOYMENT_PLAN: main.yml
+  OSDC_DEPLOYMENT_PLAN: main.yml
+
+includes:
+  deployment:
+    taskfile: '{{.DATA_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/{{.DEPLOYMENT_PLAN}}'
+    vars:
+      ENV: '{{.ENV}}'
+      DATA_DIR: '{{.DATA_DIR}}'
+      DEPLOYMENT_TYPE: '{{.DEPLOYMENT_TYPE}}'
+      DEPLOYMENT_VERSION: '{{.DEPLOYMENT_VERSION}}'
+  onboarder:
+    taskfile: '{{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/{{.ONBOARDER_PLAN}}'
+    vars:
+      ENV: '{{.ENV}}'
+      DATA_DIR: '{{.DATA_DIR}}'
+      ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
+  node_prep:
+    taskfile: '{{.DATA_DIR}}/node_prep/{{.ONBOARDER_VERSION}}/{{.NODE_PREP_PLAN}}'
+    vars:
+      ENV: '{{.ENV}}'
+      DATA_DIR: '{{.DATA_DIR}}'
+      ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
+  
+  ### NEED TO WORK THE CLUSTER DEPLOYMENT INTO HERE ###
+  osms_deployment:
+    taskfile: '{{.DATA_DIR}}/cluster_deployment/{{.ONBOARDER_VERSION}}/{{.OSMS_DEPLOYMENT_PLAN}}'
+    vars:
+      ENV: '{{.ENV}}'
+      DATA_DIR: '{{.DATA_DIR}}'
+      ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
+  osdc_deployment:
+    taskfile: '{{.DATA_DIR}}/cluster_deployment/{{.ONBOARDER_VERSION}}/{{.OSDC_DEPLOYMENT_PLAN}}'
+    vars:
+      ENV: '{{.ENV}}'
+      DATA_DIR: '{{.DATA_DIR}}'
+      ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
+
+tasks:
+  # Phase 1: Prep
+  prep-onboarder-container:
+    desc: Prep Onboarder Container
+    cmds:
+      - task: onboarder:prep-onboarder-container
+
+  run-deployment-setup:
+    desc: Run Deployment Setup Tasks
+    cmds:
+      - task: deployment:deploy-all
+
+  # Phase 2: Deploy Infrastructure (MCM)
+  node_prep:
+    desc: Run Node Preparation Tasks
+    cmds:
+      - task: node_prep:deploy-all
+
+  run-onboarder:
+    desc: Run Complete Onboarder Deployment
+    cmds:
+      - task: onboarder:deploy-all
+
+  # Phase 3: Cluster Deployment
+  cluster_node_prep:
+    desc: Run Cluster Node Preparation Tasks
+    cmds:
+      - task: node_prep:deploy-all
+
+  deploy-cluster:
+    desc: Deploy OpenSpace Cluster
+    cmds:
+      - task: cluster_deployment:deploy-all
+
+  # Phase #: Post Install Tasks
+
+  # Full Deployment Workflow
+  prep:
+    desc: Complete environment preparation workflow
+    cmds:
+      - task: prep-onboarder-container
+      - task: run-deployment-setup
+
+  deploy-mcm:
+    desc: Complete environment deployment workflow
+    vars:
+      HOSTS: infrastructure_cluster
+      ARGS: "-e ssh_pubkey_path=/docker-workspace/environments/{{.ENV}}/.ssh/rancher_ssh_key.pub"
+    cmds:
+      - task: copy-ssh-key
+      - task: node_prep
+      - task: run-onboarder
+
+  deploy-osms:
+    desc: Complete OSMS deployment workflow
+    vars:
+      HOSTS: openspace_management_cluster
+    cmds:
+      - task: node_prep
+      - task: deploy-cluster
+
+  deploy-osdc:
+    desc: Complete OSDC deployment workflow
+    vars:
+      HOSTS: openspace_data_cluster
+    cmds:
+      - task: node_prep
+      - task: deploy-cluster
+
+
+  resume:
+    desc: Resume deployment from last state
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --resume
+
+  # Utility Tasks
+  copy-ssh-key:
+    desc: Copy SSH Key to Node
+    vars:
+      FILE: tasks/common/copy_ssh_key.yml
+      KIND: ansible
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=copy-ssh-key --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}} --args="{{.ARGS}}"
+
+  show-state:
+    desc: Show current deployment state
+    cmds:
+      - |
+        STATE_FILE="config/{{.ENV}}/.cache/state.json"
+        if [ -f "$STATE_FILE" ]; then
+          cat "$STATE_FILE" | python3 -m json.tool
+        else
+          echo "No state file found for {{.ENV}}"
+        fi
+
+  clean-state:
+    desc: Clean deployment state (start fresh)
+    prompt: This will delete the state file for {{.ENV}}. Continue?
+    cmds:
+      - rm -f config/{{.ENV}}/.cache/state.json
+      - echo "State cleared for {{.ENV}}"
+
+  logs:
+    desc: List recent task logs
+    cmds:
+      - ls -lt config/{{.ENV}}/.cache/logs/ | head -10
+
+  tail-log:
+    desc: Tail a specific task log
+    requires:
+      vars: [TASK_ID]
+    cmds:
+      - tail -f config/{{.ENV}}/.cache/logs/{{.TASK_ID}}.log

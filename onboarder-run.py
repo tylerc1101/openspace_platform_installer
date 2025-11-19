@@ -221,13 +221,23 @@ def run_interactive_shell(
         print(f"Runtime:           {runtime}")
         print(f"Working Directory: /docker-workspace")
         print()
-        print(f"{Colors.GREEN}To run a deployment:{Colors.ENDC}")
-        print(f"  python3 deploy-env.py")
+        print(f"{Colors.YELLOW}Setup Steps:{Colors.ENDC}")
+        print(f"  1. Symlink your environment to config directory:")
+        print(f"     ln -s environments/afcgi/skcp_bottom config/afcgi/skcp_bottom")
         print()
-        print(f"{Colors.BLUE}Available commands:{Colors.ENDC}")
-        print(f"  python3 deploy-env.py              # Interactive deployment")
-        print(f"  python3 deploy-env.py --env=<n>    # Specific environment")
-        print(f"  python3 deploy-env.py --help       # See all options")
+        print(f"{Colors.GREEN}To run a deployment:{Colors.ENDC}")
+        print(f"  cd config/afcgi/skcp_bottom")
+        print(f"  task prep")
+        print(f"  task deploy-mcm")
+        print()
+        print(f"{Colors.BLUE}Available task commands:{Colors.ENDC}")
+        print(f"  task --list                        # List all available tasks")
+        print(f"  task prep                          # Prepare environment")
+        print(f"  task deploy-mcm                    # Deploy MCM infrastructure")
+        print(f"  task deploy-prod-osms              # Deploy OSMS cluster")
+        print(f"  task deploy-prod-osdc              # Deploy OSDC cluster")
+        print(f"  task show-state                    # Show deployment state")
+        print(f"  task resume                        # Resume failed deployment")
         print()
         print(f"{Colors.YELLOW}Container Management:{Colors.ENDC}")
         print(f"  exit                               # Exit shell (container persists)")
@@ -244,7 +254,6 @@ def run_interactive_shell(
             "-v", f"{DATA_DIR}:/docker-workspace/data:{selinux_opt}",
             "-v", f"{IMAGES_DIR}:/docker-workspace/images:{selinux_opt}",
             "-v", f"{ENVIRONMENTS_DIR}:/docker-workspace/environments:{selinux_opt}",
-            "-v", f"{SCRIPT_DIR}/deploy-env.py:/docker-workspace/deploy-env.py:{selinux_opt}",
             "-w", "/docker-workspace",
             image_ref,
             "/bin/bash"
@@ -271,8 +280,15 @@ def main():
 This script loads the onboarder container and drops you into an interactive shell.
 If a container named 'onboarder' already exists, it will attach to it instead.
 
-Once inside, run:
-  python3 deploy-env.py
+Setup:
+  1. Start the container with this script
+  2. Inside the container, symlink your environment:
+     ln -s environments/afcgi/skcp_bottom config/afcgi/skcp_bottom
+  3. Navigate to your environment:
+     cd config/afcgi/skcp_bottom
+  4. Run tasks:
+     task prep
+     task deploy-mcm
 
 Container Management:
   ./onboarder-run.py              # Start or attach to container
@@ -284,10 +300,12 @@ Examples:
   ./onboarder-run.py
   
   # Inside the container, run deployments
-  python3 deploy-env.py                    # Interactive selection
-  python3 deploy-env.py --env=my_env       # Specific environment
-  python3 deploy-env.py --validate-only    # Validate only
-  python3 deploy-env.py --resume           # Resume deployment
+  cd config/afcgi/skcp_bottom
+  task --list                      # See all available tasks
+  task prep                        # Prepare environment
+  task deploy-mcm                  # Deploy MCM infrastructure
+  task show-state                  # Check deployment status
+  task resume                      # Resume failed deployment
         """
     )
     
@@ -300,6 +318,9 @@ Examples:
     if not ENVIRONMENTS_DIR.exists():
         die(f"Environments directory not found: {ENVIRONMENTS_DIR}")
     
+    if not IMAGES_DIR.exists():
+        die(f"Images directory not found: {IMAGES_DIR}")
+    
     # Detect container runtime
     runtime, selinux_opt = detect_container_runtime()
     print_info(f"Using runtime: {runtime}")
@@ -310,6 +331,7 @@ Examples:
     if status != 'none':
         # Container exists, we'll attach/start it
         print_info(f"Container 'onboarder' found (status: {status})")
+        image_ref = None  # Will get from existing container
     else:
         # Need to load image for new container
         image_path = IMAGES_DIR / "onboarder" / ONBOARDER_IMAGE
@@ -321,12 +343,8 @@ Examples:
         # Load container image
         image_ref = load_container_image(runtime, image_path)
     
-    # Get image reference for creating new container
-    if status == 'none':
-        # Already loaded above
-        pass
-    else:
-        # Get image from existing container
+    # Get image reference if attaching to existing container
+    if status != 'none':
         try:
             result = subprocess.run(
                 [runtime, "inspect", "--format", "{{.Image}}", "onboarder"],

@@ -3,14 +3,15 @@ version: '3'
 tasks:
   prep-onboarder-container:
     desc: Prep Onboarder Container
-    vars:
-      HOSTS: localhost
-      FILE: '{{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/prep_onboarder_container.yml'
-      KIND: ansible
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=prep-onboarder-container --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --env={{.ENV}} 
+          --task-id=prep-onboarder-container 
+          --hosts=localhost 
+          --file={{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/tasks/prep_onboarder_container.yml 
+          --kind=ansible
 
-    deploy-rke2-cluster:
+  deploy-rke2-cluster:
     desc: Deploy RKE2 Cluster
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 

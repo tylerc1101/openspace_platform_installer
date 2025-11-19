@@ -24,7 +24,8 @@ includes:
     vars:
       ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
-      ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
+      DEPLOYMENT_TYPE: '{{.DEPLOYMENT_TYPE}}'
+      DEPLOYMENT_VERSION: '{{.DEPLOYMENT_VERSION}}'
   onboarder:
     taskfile: '{{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/{{.ONBOARDER_PLAN}}'
     vars:
@@ -67,8 +68,6 @@ tasks:
   # Phase 2: Deploy Infrastructure (MCM)
   node_prep:
     desc: Run Node Preparation Tasks
-    vars:
-      HOSTS: infrastructure_cluster
     cmds:
       - task: node_prep:deploy-all
 

@@ -5,7 +5,7 @@ tasks:
     desc: Copy SSH Key to Management KVM
     vars:
       HOSTS: mgmt_kvm
-      FILE: tasks/common/copy_ssh_key.yml
+      FILE: '{{.DATA_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/tasks/copy_ssh_key.yml'
       KIND: ansible
       ARGS: "-e ssh_pubkey_path=/docker-workspace/config/{{.ENV}}/.ssh/onboarder_ssh_key.pub"
     cmds:
@@ -15,7 +15,7 @@ tasks:
     desc: Bootstrap Management KVM Server
     vars:
       HOSTS: mgmt_kvm
-      FILE: tasks/basekit/bootstrap-mgmt-kvm.yml
+      FILE: '{{.DATA_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/tasks/bootstrap-mgmt-kvm.yml'
       KIND: ansible
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=bootstrap-mgmt-kvm --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
@@ -24,7 +24,7 @@ tasks:
     desc: Generate OPNsense Configuration
     vars:
       HOSTS: localhost
-      FILE: tasks/basekit/configure-opnsense.yml
+      FILE: '{{.DATA_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/tasks/configure-opnsense.yml'
       KIND: ansible
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=configure-opnsense --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
@@ -33,7 +33,7 @@ tasks:
     desc: Copy OPNsense Config to Management KVM
     vars:
       HOSTS: mgmt_kvm
-      FILE: tasks/basekit/copy-opnsense-config.yml
+      FILE: '{{.DATA_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/tasks/copy-opnsense-config.yml'
       KIND: ansible
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=copy-opnsense-config --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
@@ -54,7 +54,7 @@ tasks:
     desc: Deploy VMs on Management KVM
     vars:
       HOSTS: mgmt_kvm
-      FILE: tasks/basekit/deploy-vms.yml
+      FILE: '{{.DATA_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/tasks/deploy-vms.yml'
       KIND: ansible
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-vms --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
@@ -63,7 +63,7 @@ tasks:
     desc: Configure VM Disk Partitions
     vars:
       HOSTS: clusters
-      FILE: tasks/basekit/configure-vm-partitions.yml
+      FILE: '{{.DATA_DIR}}/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/tasks/configure-vm-partitions.yml'
       KIND: ansible
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=configure-vm-partitions --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}

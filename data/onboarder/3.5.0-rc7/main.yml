@@ -5,7 +5,7 @@ tasks:
     desc: Prep Onboarder Container
     vars:
       HOSTS: localhost
-      FILE: tasks/common/prep_onboarder_container.yml
+      FILE: '{{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/prep_onboarder_container.yml'
       KIND: ansible
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=prep-onboarder-container --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}

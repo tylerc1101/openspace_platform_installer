@@ -15,8 +15,7 @@ vars:
   
   NODE_PREP_PLAN: rhel9.yml
 
-  OSMS_DEPLOYMENT_PLAN: main.yml
-  OSDC_DEPLOYMENT_PLAN: main.yml
+  CLUSTER_DEPLOYMENT_PLAN: main.yml
 
 includes:
   deployment:
@@ -32,22 +31,14 @@ includes:
       ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
       ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
-  node_prep:
+  node-prep:
     taskfile: '{{.DATA_DIR}}/node_prep/{{.ONBOARDER_VERSION}}/{{.NODE_PREP_PLAN}}'
     vars:
       ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
       ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
-  
-  ### NEED TO WORK THE CLUSTER DEPLOYMENT INTO HERE ###
-  osms_deployment:
-    taskfile: '{{.DATA_DIR}}/cluster_deployment/{{.ONBOARDER_VERSION}}/{{.OSMS_DEPLOYMENT_PLAN}}'
-    vars:
-      ENV: '{{.ENV}}'
-      DATA_DIR: '{{.DATA_DIR}}'
-      ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
-  osdc_deployment:
-    taskfile: '{{.DATA_DIR}}/cluster_deployment/{{.ONBOARDER_VERSION}}/{{.OSDC_DEPLOYMENT_PLAN}}'
+  cluster-deployment:
+    taskfile: '{{.DATA_DIR}}/cluster_deployment/{{.ONBOARDER_VERSION}}/{{.CLUSTER_DEPLOYMENT_PLAN}}'
     vars:
       ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
@@ -66,10 +57,12 @@ tasks:
       - task: deployment:deploy-all
 
   # Phase 2: Deploy Infrastructure (MCM)
-  node_prep:
+  run-node-prep:
     desc: Run Node Preparation Tasks
     cmds:
-      - task: node_prep:deploy-all
+      - task: node-prep:deploy-all
+        vars:
+          HOSTS: '{{.HOSTS}}'
 
   run-onboarder:
     desc: Run Complete Onboarder Deployment
@@ -77,19 +70,21 @@ tasks:
       - task: onboarder:deploy-all
 
   # Phase 3: Cluster Deployment
-  cluster_node_prep:
-    desc: Run Cluster Node Preparation Tasks
+  run-cluster-prep:
+    desc: Run Cluster Node Preparation
     cmds:
-      - task: node_prep:deploy-all
+      - task: cluster-deployment:prep-cluster-nodes
+        vars:
+          HOSTS: '{{.HOSTS}}'
 
-  deploy-cluster:
-    desc: Deploy OpenSpace Cluster
+  run-cluster-deploy:
+    desc: Deploy Cluster
     cmds:
-      - task: cluster_deployment:deploy-all
+      - task: cluster-deployment:deploy-clusters
+        vars:
+          HOSTS: '{{.HOSTS}}'
 
-  # Phase #: Post Install Tasks
-
-  # Full Deployment Workflow
+  # Full Deployment Workflows
   prep:
     desc: Complete environment preparation workflow
     cmds:
@@ -97,45 +92,70 @@ tasks:
       - task: run-deployment-setup
 
   deploy-mcm:
-    desc: Complete environment deployment workflow
+    desc: Complete MCM infrastructure deployment
     vars:
       HOSTS: infrastructure_cluster
-      ARGS: "-e ssh_pubkey_path=/docker-workspace/environments/{{.ENV}}/.ssh/rancher_ssh_key.pub"
     cmds:
       - task: copy-ssh-key
-      - task: node_prep
+        vars:
+          HOSTS: '{{.HOSTS}}'
+          ARGS: '-e ssh_pubkey_path=/docker-workspace/config/{{.ENV}}/.ssh/rancher_ssh_key.pub'
+      - task: run-node-prep
+        vars:
+          HOSTS: '{{.HOSTS}}'
       - task: run-onboarder
 
-  deploy-osms:
-    desc: Complete OSMS deployment workflow
+  deploy-prod-osms:
+    desc: Complete production OSMS deployment workflow
     vars:
-      HOSTS: openspace_management_cluster
+      HOSTS: osms_production
     cmds:
-      - task: node_prep
-      - task: deploy-cluster
+      - task: copy-ssh-key
+        vars:
+          HOSTS: '{{.HOSTS}}'
+          ARGS: '-e ssh_pubkey_path=/docker-workspace/config/{{.ENV}}/.ssh/production_ssh_key.pub'
+      - task: run-node-prep
+        vars:
+          HOSTS: '{{.HOSTS}}'
+      - task: run-cluster-prep
+        vars:
+          HOSTS: '{{.HOSTS}}'
+      - task: run-cluster-deploy
+        vars:
+          HOSTS: '{{.HOSTS}}'
 
-  deploy-osdc:
-    desc: Complete OSDC deployment workflow
+  deploy-prod-osdc:
+    desc: Complete production OSDC deployment workflow
     vars:
-      HOSTS: openspace_data_cluster
+      HOSTS: osdc_production
     cmds:
-      - task: node_prep
-      - task: deploy-cluster
-
-
-  resume:
-    desc: Resume deployment from last state
-    cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --resume
+      - task: copy-ssh-key
+        vars:
+          HOSTS: '{{.HOSTS}}'
+          ARGS: '-e ssh_pubkey_path=/docker-workspace/config/{{.ENV}}/.ssh/production_ssh_key.pub'
+      - task: run-node-prep
+        vars:
+          HOSTS: '{{.HOSTS}}'
+      - task: run-cluster-prep
+        vars:
+          HOSTS: '{{.HOSTS}}'
+      - task: run-cluster-deploy
+        vars:
+          HOSTS: '{{.HOSTS}}'
 
   # Utility Tasks
   copy-ssh-key:
     desc: Copy SSH Key to Node
     vars:
-      FILE: tasks/common/copy_ssh_key.yml
+      FILE: '{{.DATA_DIR}}/common/copy_ssh_key.yml'
       KIND: ansible
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=copy-ssh-key --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}} --args="{{.ARGS}}"
+
+  resume:
+    desc: Resume deployment from last state
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --resume
 
   show-state:
     desc: Show current deployment state

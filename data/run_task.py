@@ -115,7 +115,7 @@ class TaskExecutor:
     def __init__(self, env: str, logger: TaskLogger):
         self.env = env
         self.logger = logger
-        self.data_dir = Path("/data")
+        self.data_dir = Path("/docker-workspace/data")
         self.config_dir = Path(f"config/{env}")
     
     def execute(self, task_id: str, kind: str, **kwargs):

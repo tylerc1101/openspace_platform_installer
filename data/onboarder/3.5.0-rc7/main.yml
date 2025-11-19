@@ -10,71 +10,78 @@ tasks:
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=prep-onboarder-container --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
 
-  deploy-rke2-cluster:
+    deploy-rke2-cluster:
     desc: Deploy RKE2 Cluster
-    vars:
-      KIND: shell
-      COMMAND: cd /docker-workspace; make ansible-deploy-rke2-cluster ENVIRONMENT={{.ENV}}
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-rke2-cluster --kind={{.KIND}} --command="{{.COMMAND}}"
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --env={{.ENV}} 
+          --task-id=deploy-rke2-cluster 
+          --kind=shell 
+          --command="cd /docker-workspace && make ansible-deploy-rke2-cluster ENVIRONMENT={{.ENV}}"
 
   bootstrap-container-images:
     desc: Bootstrap Container Images
-    vars:
-      KIND: shell
-      COMMAND: cd /docker-workspace; make bootstrap-container-images-run ENVIRONMENT={{.ENV}}
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=bootstrap-container-images --kind={{.KIND}} --command="{{.COMMAND}}"
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --env={{.ENV}} 
+          --task-id=bootstrap-container-images 
+          --kind=shell 
+          --command="cd /docker-workspace && make bootstrap-container-images-run ENVIRONMENT={{.ENV}}"
 
   deploy-harbor:
     desc: Deploy Harbor Registry
-    vars:
-      KIND: shell
-      COMMAND: cd /docker-workspace; make helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={{.ENV}}
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-harbor --kind={{.KIND}} --command="{{.COMMAND}}"
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --env={{.ENV}} 
+          --task-id=deploy-harbor 
+          --kind=shell 
+          --command="cd /docker-workspace && make helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={{.ENV}}"
 
   load-darksite-bundles:
     desc: Load Darksite Bundles
-    vars:
-      KIND: shell
-      COMMAND: cd /docker-workspace; make load-darksite-bundles ENVIRONMENT={{.ENV}}
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=load-darksite-bundles --kind={{.KIND}} --command="{{.COMMAND}}"
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --env={{.ENV}} 
+          --task-id=load-darksite-bundles 
+          --kind=shell 
+          --command="cd /docker-workspace && make load-darksite-bundles ENVIRONMENT={{.ENV}}"
 
   deploy-rancher:
     desc: Deploy Rancher
-    vars:
-      KIND: shell
-      COMMAND: cd /docker-workspace; make helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={{.ENV}}
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-rancher --kind={{.KIND}} --command="{{.COMMAND}}"
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --env={{.ENV}} 
+          --task-id=deploy-rancher 
+          --kind=shell 
+          --command="cd /docker-workspace && make helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={{.ENV}}"
 
   terraform-rancher:
     desc: Bootstrap Rancher with Terraform
-    vars:
-      KIND: shell
-      COMMAND: cd /docker-workspace; make terraform-rancher-bootstrap-apply ENVIRONMENT={{.ENV}}
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=terraform-rancher --kind={{.KIND}} --command="{{.COMMAND}}"
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --env={{.ENV}} 
+          --task-id=terraform-rancher 
+          --kind=shell 
+          --command="cd /docker-workspace && make terraform-rancher-bootstrap-apply ENVIRONMENT={{.ENV}}"
 
   deploy-gitea:
     desc: Deploy Gitea
-    vars:
-      KIND: shell
-      COMMAND: cd /docker-workspace; make install-gitea ENVIRONMENT={{.ENV}}
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-gitea --kind={{.KIND}} --command="{{.COMMAND}}"
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --env={{.ENV}} 
+          --task-id=deploy-gitea 
+          --kind=shell 
+          --command="cd /docker-workspace && make install-gitea ENVIRONMENT={{.ENV}}"
 
   deploy-argocd:
     desc: Deploy ArgoCD
-    vars:
-      KIND: shell
-      COMMAND: cd /docker-workspace; make install-argocd ENVIRONMENT={{.ENV}}
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=deploy-argocd --kind={{.KIND}} --command="{{.COMMAND}}"
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --env={{.ENV}} 
+          --task-id=deploy-argocd 
+          --kind=shell 
+          --command="cd /docker-workspace && make install-argocd ENVIRONMENT={{.ENV}}"
 
-  # The workflow that orchestrates all steps
   deploy-all:
     desc: Run all Onboarder deployment steps
     cmds:

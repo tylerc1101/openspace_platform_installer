@@ -3,85 +3,76 @@ version: '3'
 tasks:
   prep-onboarder-container:
     desc: Prep Onboarder Container
+    vars:
+      HOSTS: localhost
+      FILE: '{{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/tasks/prep_onboarder_container.yml'
+      KIND: ansible
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py 
-          --env={{.ENV}} 
-          --task-id=prep-onboarder-container 
-          --hosts=localhost 
-          --file={{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/tasks/prep_onboarder_container.yml 
-          --kind=ansible
+      - python3 {{.DATA_DIR}}/run_task.py --task-id=prep-onboarder-container --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
 
   deploy-rke2-cluster:
     desc: Deploy RKE2 Cluster
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --env={{.ENV}} 
           --task-id=deploy-rke2-cluster 
           --kind=shell 
-          --command="cd /docker-workspace && make ansible-deploy-rke2-cluster ENVIRONMENT={{.ENV}}"
+          --command="cd /docker-workspace && make ansible-deploy-rke2-cluster ENVIRONMENT=install"
 
   bootstrap-container-images:
     desc: Bootstrap Container Images
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --env={{.ENV}} 
           --task-id=bootstrap-container-images 
           --kind=shell 
-          --command="cd /docker-workspace && make bootstrap-container-images-run ENVIRONMENT={{.ENV}}"
+          --command="cd /docker-workspace && make bootstrap-container-images-run ENVIRONMENT=install"
 
   deploy-harbor:
     desc: Deploy Harbor Registry
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --env={{.ENV}} 
           --task-id=deploy-harbor 
           --kind=shell 
-          --command="cd /docker-workspace && make helmfile-install HELMFILE_CHART=harbor ENVIRONMENT={{.ENV}}"
+          --command="cd /docker-workspace && make helmfile-install HELMFILE_CHART=harbor ENVIRONMENT=install"
 
   load-darksite-bundles:
     desc: Load Darksite Bundles
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --env={{.ENV}} 
           --task-id=load-darksite-bundles 
           --kind=shell 
-          --command="cd /docker-workspace && make load-darksite-bundles ENVIRONMENT={{.ENV}}"
+          --command="cd /docker-workspace && make load-darksite-bundles ENVIRONMENT=install"
 
   deploy-rancher:
     desc: Deploy Rancher
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --env={{.ENV}} 
           --task-id=deploy-rancher 
           --kind=shell 
-          --command="cd /docker-workspace && make helmfile-install HELMFILE_CHART=rancher ENVIRONMENT={{.ENV}}"
+          --command="cd /docker-workspace && make helmfile-install HELMFILE_CHART=rancher ENVIRONMENT=install"
 
   terraform-rancher:
     desc: Bootstrap Rancher with Terraform
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --env={{.ENV}} 
           --task-id=terraform-rancher 
           --kind=shell 
-          --command="cd /docker-workspace && make terraform-rancher-bootstrap-apply ENVIRONMENT={{.ENV}}"
+          --command="cd /docker-workspace && make terraform-rancher-bootstrap-apply ENVIRONMENT=install"
 
   deploy-gitea:
     desc: Deploy Gitea
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --env={{.ENV}} 
           --task-id=deploy-gitea 
           --kind=shell 
-          --command="cd /docker-workspace && make install-gitea ENVIRONMENT={{.ENV}}"
+          --command="cd /docker-workspace && make install-gitea ENVIRONMENT=install"
 
   deploy-argocd:
     desc: Deploy ArgoCD
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --env={{.ENV}} 
           --task-id=deploy-argocd 
           --kind=shell 
-          --command="cd /docker-workspace && make install-argocd ENVIRONMENT={{.ENV}}"
+          --command="cd /docker-workspace && make install-argocd ENVIRONMENT=install"
 
   deploy-all:
     desc: Run all Onboarder deployment steps

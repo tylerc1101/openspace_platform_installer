@@ -3,19 +3,21 @@ version: '3'
 tasks:
   node-prep:
     desc: Cluster Node Prep
-    vars:
-      FILE: ./tasks/configure-node.yml
-      KIND: ansible
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=configure-node --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --task-id=configure-node 
+          --hosts={{.HOSTS}} 
+          --file={{.DATA_DIR}}/node_prep/{{.ONBOARDER_VERSION}}/tasks/configure-node.yml 
+          --kind=ansible
 
   install-rke2-selinux:
     desc: Install RKE2 SELinux Package
-    vars:
-      FILE: ./tasks/install_rke2-selinux.yml
-      KIND: ansible
     cmds:
-      - python3 {{.DATA_DIR}}/run_task.py --env={{.ENV}} --task-id=install-rke2-selinux --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+      - python3 {{.DATA_DIR}}/run_task.py 
+          --task-id=install-rke2-selinux 
+          --hosts={{.HOSTS}} 
+          --file={{.DATA_DIR}}/node_prep/{{.ONBOARDER_VERSION}}/tasks/install_rke2-selinux.yml 
+          --kind=ansible
 
   deploy-all:
     desc: Run All Node Prep Tasks

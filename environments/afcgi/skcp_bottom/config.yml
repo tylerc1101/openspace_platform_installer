@@ -15,7 +15,7 @@ all:
         # ===========================================================
        
         # Domain used across the environment (used in DNS, certs, etc.)
-        domain_name: "base-kit-1.kratos"
+        domain_name: "base-kit-3.kratos"
 
         # Customer Network - WAN/External network info
         customer_network:

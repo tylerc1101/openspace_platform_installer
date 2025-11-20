@@ -3,6 +3,8 @@ version: '3'
 tasks:
   node-prep:
     desc: Cluster Node Prep
+    requires:
+      vars: [HOSTS]
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
           --task-id=configure-node 
@@ -12,6 +14,8 @@ tasks:
 
   install-rke2-selinux:
     desc: Install RKE2 SELinux Package
+    requires:
+      vars: [HOSTS]
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
           --task-id=install-rke2-selinux 
@@ -21,6 +25,12 @@ tasks:
 
   deploy-all:
     desc: Run All Node Prep Tasks
+    requires:
+      vars: [HOSTS]
     cmds:
       - task: node-prep
+        vars:
+          HOSTS: '{{.HOSTS}}'
       - task: install-rke2-selinux
+        vars:
+          HOSTS: '{{.HOSTS}}'

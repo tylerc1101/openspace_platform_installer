@@ -156,7 +156,6 @@ class TaskExecutor:
                 cmd,
                 env=env_vars,
                 check=True,
-                capture_output=True,
                 text=True
             )
             self.logger.info(f"Task {task_id} completed successfully")
@@ -177,7 +176,6 @@ class TaskExecutor:
                 command,
                 shell=True,
                 check=True,
-                capture_output=True,
                 text=True
             )
             self.logger.info(f"Task {task_id} completed successfully")

@@ -52,7 +52,7 @@
     # c) Create terraform state file
     - name: Create vm-terraform.tfstate inside container
       template:
-        src: /docker-workspace/data/templates/basekit_vm-terraform.tfstate.j2
+        src: ../files/basekit_vm-terraform.tfstate.j2
         dest: "{{ cache_dir }}/vm-terraform.tfstate"
         owner: root
         group: root

@@ -59,7 +59,7 @@ all:
         # mgmt_kvm - Management hypervisor running OpenSpace VMs
         # -----------------------------------------------------------
         mgmt_kvm:
-          ansible_host: 10.243.77.211       # SSH target address for mgmt_kvm
+          ansible_host: 10.243.77.214       # SSH target address for mgmt_kvm
 
           # Network interfaces for this physical server
           wan_address: "{{ ansible_host }}"

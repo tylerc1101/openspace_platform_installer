@@ -7,7 +7,7 @@ tasks:
       vars: [HOSTS]
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --task-id=configure-node 
+          --task-id=configure-node-{{.HOSTS}} 
           --hosts={{.HOSTS}} 
           --file={{.DATA_DIR}}/node_prep/{{.ONBOARDER_VERSION}}/tasks/configure-node.yml 
           --kind=ansible
@@ -18,7 +18,7 @@ tasks:
       vars: [HOSTS]
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --task-id=install-rke2-selinux 
+          --task-id=install-rke2-selinux-{{.HOSTS}} 
           --hosts={{.HOSTS}} 
           --file={{.DATA_DIR}}/node_prep/{{.ONBOARDER_VERSION}}/tasks/install_rke2-selinux.yml 
           --kind=ansible

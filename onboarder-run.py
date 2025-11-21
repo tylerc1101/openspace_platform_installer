@@ -250,6 +250,7 @@ def run_interactive_shell(
         container_cmd = [
             runtime, "run",
             "--name", container_name,
+            "--network", "host",
             "-it",   # Interactive with TTY
             "-v", f"{DATA_DIR}:/docker-workspace/data:{selinux_opt}",
             "-v", f"{IMAGES_DIR}:/docker-workspace/images:{selinux_opt}",

@@ -53,7 +53,7 @@ all:
         # opnsense - Firewall / Router appliance
         # -----------------------------------------------------------
         opnsense:
-          wan_ip: "10.243.77.221"     # External IP for firewall management
+          wan_ip: "10.243.77.224"     # External IP for firewall management
 
         # -----------------------------------------------------------
         # mgmt_kvm - Management hypervisor running OpenSpace VMs

@@ -1,460 +1,391 @@
 # OpenSpace Platform Installer
 
-A configuration-driven infrastructure deployment system that orchestrates installation workflows using containerized execution.
+A stateful, containerized deployment orchestration system for OpenSpace infrastructure using Taskfile-based workflows.
 
-## 📁 Directory Structure
+## Quick Links
+
+- [**Getting Started**](docs/GETTING_STARTED.md) - Quick start guide for first-time users
+- [**Requirements**](docs/REQUIREMENTS.md) - Prerequisites and dependencies
+- [**Overview**](docs/OVERVIEW.md) - What the installer does and how it works
+- [**Configuration**](docs/CONFIGURATION.md) - Detailed configuration reference
+- [**Taskfiles**](docs/TASKFILES.md) - Understanding and creating deployment workflows
+- [**Architecture**](docs/ARCHITECTURE.md) - System design and technical details
+- [**Troubleshooting**](docs/TROUBLESHOOTING.md) - Common issues and solutions
+
+## What Is This?
+
+The OpenSpace Platform Installer ("Onboarder") provides a reproducible, stateful deployment system for complex OpenSpace infrastructure. It orchestrates:
+
+- **Base infrastructure** (Management KVM, OPNsense firewall, networking)
+- **MCM (Management Cluster)** - RKE2-based Kubernetes infrastructure cluster
+- **OSMS (OpenSpace Management System)** - Management plane cluster
+- **OSDC (OpenSpace Data Cluster)** - Data plane cluster
+
+### Key Technologies
+
+- **Taskfile**: YAML-based task runner for workflow orchestration
+- **Python orchestration**: run_task.py for state management and logging
+- **Containerized execution**: All deployments run in isolated Podman/Docker container
+- **Ansible playbooks**: Infrastructure configuration management
+- **Stateful tracking**: Resume deployments after interruptions
+
+## Features
+
+✅ **Taskfile-based orchestration** - Readable YAML workflows with clear task dependencies  
+✅ **Stateful execution** - Tracks completed tasks, resumes after failures  
+✅ **Containerized isolation** - All dependencies pre-installed, consistent environment  
+✅ **Real-time logging** - Stream output from long-running tasks  
+✅ **Modular design** - Separate taskfiles for each deployment phase  
+✅ **Idempotent operations** - Safe to re-run without side effects  
+✅ **Air-gapped support** - Works in disconnected environments  
+✅ **Variable inheritance** - Pass configuration through task hierarchies  
+✅ **Ansible integration** - Leverage existing playbooks and roles  
+
+## Directory Structure
 
 ```
 openspace_platform_installer/
-├── images/                      # Large binary files
-│   ├── rpms/                   # RPMs to install in container (e.g., sshpass)
-│   └── onboarder/              # Container images
-├── data/                        # Installation logic (reusable)
-│   ├── main.py                 # Main orchestrator
-│   ├── ansible.cfg             # Ansible configuration (STIG-compatible)
-│   ├── profiles/               # Profile definitions
-│   │   ├── basekit/
-│   │   │   └── default.yml
-│   │   ├── baremetal/
-│   │   └── aws/
-│   ├── tasks/                  # Ansible playbooks & scripts
-│   │   ├── common/
-│   │   │   └── copy_ssh_key.yml
-│   │   └── basekit/
-│   │       ├── bootstrap-mgmt-kvm.yml
-│   │       ├── deploy-vms.yml
-│   │       └── deploy-opnsense.py
-│   └── files/
-│       └── kratos.repo
-├── usr_home/                    # Environment configurations (customizable)
-│   ├── <your_environment>/
-│   │   ├── config.yml          # Ansible inventory
-│   │   ├── group_vars/         # Variables per profile/group/host
-│   │   │   ├── basekit.yml    # Profile config (profile_kind, profile_name, images)
-│   │   │   ├── mgmt_svr.yml   # Group-specific vars (interfaces, etc.)
-│   │   │   └── vms.yml
-│   │   ├── .ssh/               # SSH keys
-│   │   └── logs/               # Execution logs
-│   └── sample_basekit/         # Template environments
-└── onboarder-run.py            # Runner script
+├── data/                          # Deployment logic and tasks
+│   ├── run_task.py               # Task execution engine with state management
+│   ├── basekit/
+│   │   └── 1.0.1/
+│   │       ├── main.yml          # Basekit taskfile definitions
+│   │       └── tasks/            # Ansible playbooks
+│   ├── cluster_deployment/
+│   │   └── 1.0.1/
+│   │       ├── main.yml          # Cluster deployment taskfile
+│   │       └── tasks/            # Cluster-specific playbooks
+│   ├── common/                    # Shared Ansible playbooks
+│   │   ├── copy_ssh_key.yml
+│   │   └── ...
+│   └── node_prep/                 # Node preparation tasks
+│       └── 1.0.1/
+│           ├── main.yml
+│           └── tasks/
+├── images/                        # Container images and ISOs
+│   ├── onboarder/                # Onboarder container image
+│   ├── rpms/                     # RPMs to install in container
+│   └── opnsense/                 # OPNsense ISO
+├── environments/                  # Environment-specific configurations
+│   └── <environment_name>/
+│       ├── Taskfile.yml          # Main orchestration workflow
+│       ├── config.yml            # Ansible inventory
+│       ├── group_vars/           # Ansible variables
+│       │   └── all.yml
+│       ├── .ssh/                 # SSH keys
+│       └── logs/                 # Execution logs (auto-created)
+└── onboarder-run.py              # Container launcher script
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
-### 1. Create Your Environment
-
+### 1. Prepare Container
 ```bash
-# Copy a sample environment
-cp -r usr_home/sample_basekit usr_home/my_deployment
-
-# Edit configuration
-cd usr_home/my_deployment
-vim config.yml              # Set IPs, hostnames, passwords
-vim group_vars/basekit.yml  # Set profile_kind, profile_name, image versions
-```
-
-### 2. Configure Your Environment
-
-**`group_vars/basekit.yml`** - Main configuration:
-```yaml
-profile_kind: "basekit"      # Profile type: basekit, baremetal, or aws
-profile_name: "default"      # Which profile variant to use
-
-# Image references
-onboarder: "onboarder-full.v3.5.0-rc7.tar.gz"
-basekit: "openspace-base-kit-1.0.1-config.tar.gz"
-osms: "openspace-1.9.0-295.os-app"
-```
-
-**`config.yml`** - Inventory with hosts and credentials:
-```yaml
-all:
-  children:
-    basekit:
-      vars:
-        domain_name: "base-kit.kratos"
-        customer_network:
-          gateway: "10.243.76.1"
-          cidr: "/23"
-      children:
-        mgmt_svr:
-          hosts:
-            mgmt_kvm:
-              ansible_host: 10.243.77.212
-              ansible_user: kratos
-              ansible_ssh_pass: "your_password"  # For initial bootstrap
-```
-
-### 3. Validate Configuration
-
-```bash
-python3 onboarder-run.py --env=my_deployment --validate-only
-```
-
-This checks:
-- ✓ Required files exist
-- ✓ YAML syntax is valid
-- ✓ Profile structure is correct
-- ✓ All task files exist
-
-### 4. Run the Deployment
-
-```bash
-# Interactive environment selection
+# Start the onboarder container
 python3 onboarder-run.py
 
-# Or specify environment
-python3 onboarder-run.py --env=my_deployment
-
-# Resume from last successful step after fixing issues
-python3 onboarder-run.py --env=my_deployment --resume
-
-# Verbose output for debugging
-python3 onboarder-run.py --env=my_deployment --verbose
+# Inside container, symlink your environment
+cd /docker-workspace
+ln -s config/<your_environment> install
+cd install
 ```
 
-## 📋 Profile Structure
-
-Profiles define the installation workflow. Located in `data/profiles/<profile_kind>/<profile_name>.yml`
-
-```yaml
-metadata:
-  name: "Base-Kit Default"
-  version: "1.0.0"
-  description: "Deploys management KVM with VMs"
-  profile_kind: basekit
-
-requirements:
-  # Validate these exist before running
-  inventory_groups:
-    - mgmt_kvm
-  files:
-    - "/docker-workspace/config/{env}/.ssh/onboarder_ssh_key.pub"
-
-steps:
-  - id: copy_ssh_key
-    description: "Copy SSH Key to mgmt_kvm"
-    kind: ansible                    # ansible, python3, bash, shell, sh
-    file: "tasks/common/copy_ssh_key.yml"
-    args:
-      - "-e env_name={env}"          # Variables are substituted
-      - "-e target_hosts=mgmt_kvm"
-    on_failure: fail                 # fail (default), continue, retry
-    required: true                   # Cannot be skipped
-    timeout: 300                     # Seconds (optional)
-
-  - id: bootstrap_mgmt_kvm
-    description: "Bootstrap Mgmt KVM"
-    kind: ansible
-    file: "tasks/basekit/bootstrap-mgmt-kvm.yml"
-    timeout: 1800
-```
-
-### Variable Substitution
-
-These placeholders are replaced in step arguments:
-- `{env}` - Environment name (e.g., `my_deployment`)
-- `{profile}` - Profile name (e.g., `default`)
-- `{profile_kind}` - Profile kind (e.g., `basekit`)
-- `{variable}` - Any variable from `group_vars/basekit.yml` (e.g., `{onboarder}`)
-
-## 🔧 Command Options
-
+### 2. Configure Environment
 ```bash
-python3 onboarder-run.py [OPTIONS]
+# Edit Ansible inventory
+vim config.yml
 
-Options:
-  --env=NAME          Environment name (or select interactively)
-  --validate-only     Only validate, don't run
-  --resume            Resume from last successful step
-  --verbose, -v       Enable debug logging
-  --help, -h          Show help
+# Edit Ansible variables
+vim group_vars/all.yml
+
+# Ensure SSH keys are present
+ls -la .ssh/
 ```
 
-## 📊 Log Files
-
-Logs are stored in `usr_home/<env>/logs/`:
-
-```
-logs/
-├── onboarder.log                                    # Main orchestrator log
-├── state.json                                       # Progress tracking
-├── 00-install-rpms.log                             # RPM installation
-├── copy_ssh_key-Copy_SSH_Key_to_mgmt_kvm.log      # Step 1
-├── bootstrap_mgmt_kvm-Bootstrap_Mgmt_KVM.log       # Step 2
-└── deploy_vms-Deploy_VMs.log                       # Step 3
-```
-
-## 🔄 State Management
-
-Progress is tracked in `state.json`:
-```json
-{
-  "env": "my_deployment",
-  "profile_kind": "basekit",
-  "profile_name": "default",
-  "steps": {
-    "copy_ssh_key": {
-      "status": "ok",
-      "exit_code": 0,
-      "log": "/install/logs/copy_ssh_key.log"
-    },
-    "bootstrap_mgmt_kvm": {
-      "status": "running"
-    }
-  }
-}
-```
-
-Use `--resume` to skip completed steps and continue from where you left off.
-
-## 🛠️ How It Works
-
-1. **Environment Selection** - Choose which environment to deploy
-2. **Profile Detection** - Reads `profile_kind` and `profile_name` from `group_vars/basekit.yml`
-3. **Validation** - Checks config files, profile structure, and file existence
-4. **RPM Installation** - Installs any RPMs from `images/rpms/` (e.g., sshpass)
-5. **Step Execution** - Runs each step in the profile sequentially
-6. **Progress Tracking** - Saves state after each step for resume capability
-
-### Container Execution
-
-The runner script:
-1. Detects container runtime (podman or docker)
-2. Loads the onboarder container image
-3. Mounts necessary directories:
-   - `/install/data` → `./data/`
-   - `/install/images` → `./images/`
-   - `/docker-workspace/config/{env}` → `./usr_home/{env}/`
-   - `/install/logs` → `./usr_home/{env}/logs/`
-4. Executes `main.py` inside the container
-
-## 📝 Configuration Guide
-
-### Ansible Inventory Best Practices
-
-**Use underscores in host/group names:**
-```yaml
-# ✅ Correct
-mgmt_kvm:
-  ansible_host: 10.243.77.212
-
-# ❌ Wrong - hyphens cause issues
-mgmt-kvm:
-  ansible_host: 10.243.77.212
-```
-
-**Group Variables Hierarchy:**
-
-Ansible loads variables in this order:
-1. `group_vars/all.yml` - All hosts
-2. `group_vars/basekit.yml` - Profile-level config
-3. `group_vars/mgmt_svr.yml` - Group-specific vars
-4. `host_vars/mgmt_kvm.yml` - Host-specific vars (optional)
-
-### Adding RPMs to Container
-
-Place RPMs in `images/rpms/` and they'll be installed automatically:
+### 3. Run Deployment
 ```bash
-images/rpms/
-├── sshpass-1.09-4.el9.x86_64.rpm
-└── any-other-package.rpm
+# Run full deployment workflow
+task prep
+task deploy-mcm
+task deploy-prod-osms
+task deploy-prod-osdc
+
+# Or run specific tasks
+task infrastructure_cluster_prep
+task run-node-prep
 ```
 
-### DISA STIG Compatibility
-
-The included `ansible.cfg` is configured for DISA STIG hardened RHEL 9 systems:
-- STIG-approved ciphers (aes128-ctr, aes256-ctr, aes-gcm)
-- STIG-approved MACs (hmac-sha2-256, hmac-sha2-512)
-- STIG-approved key exchange algorithms
-- Proper SSH connection settings
-
-## 🐛 Troubleshooting
-
-### "Could not determine profile kind"
-**Cause:** Missing or incorrect `profile_kind` in group_vars
-
-**Fix:**
+### 4. Monitor Progress
 ```bash
-# Ensure group_vars/basekit.yml has:
-profile_kind: "basekit"
-profile_name: "default"
+# Logs are in the environment directory
+tail -f .cache/logs/task_<task-id>.log
+
+# Check state
+cat .cache/state.json
 ```
 
-### "Variable X is undefined"
-**Cause:** Variable referenced in playbook doesn't exist in inventory
+## Usage Examples
 
-**Fix:** Check that:
-1. Variable is defined in appropriate group_vars file
-2. Group name in group_vars matches your inventory structure
-3. Variable uses correct format (underscores, not hyphens in Jinja2)
-
-### "Invalid/incorrect password"
-**Cause:** SSH password authentication failing
-
-**Fix:**
-1. Verify `ansible_ssh_pass` is set in inventory for the host
-2. Ensure sshpass RPM is in `images/rpms/`
-3. Test manually: `sshpass -p 'password' ssh user@host`
-
-### Step Failed - How to Resume
-1. Check the log file mentioned in the error
-2. Fix the underlying issue
-3. Run with `--resume` to skip completed steps:
-   ```bash
-   python3 onboarder-run.py --env=my_deployment --resume
-   ```
-
-### Validate Before Running
-Always validate first to catch 90% of issues:
+### Full Deployment Workflow
 ```bash
-python3 onboarder-run.py --env=my_deployment --validate-only
+# Complete infrastructure deployment
+task prep                    # Prepare environment
+task deploy-mcm             # Deploy management cluster
+task deploy-prod-osms       # Deploy OSMS cluster
+task deploy-prod-osdc       # Deploy OSDC cluster
 ```
 
-## 🎯 Exit Codes
-
-- `0` - Success
-- `2` - Configuration error (missing files, bad YAML)
-- `3` - File not found
-- `4` - Unsupported step kind
-- `5` - Step execution failed
-- `6` - Validation failed
-
-## 🔐 Security Notes
-
-### SSH Password Storage
-
-**Development/Testing:**
-```yaml
-# Store in plaintext (NOT for production)
-ansible_ssh_pass: "your_password"
-```
-
-**Production:**
-```yaml
-# Use Ansible Vault
-ansible_ssh_pass: !vault |
-  $ANSIBLE_VAULT;1.1;AES256
-  ...
-```
-
-**Best Practice:**
-After initial SSH key deployment, remove passwords from inventory since key-based auth will be used.
-
-## 📚 Example Workflows
-
-### New Deployment
-
+### Individual Task Execution
 ```bash
-# 1. Create environment from template
-cp -r usr_home/sample_basekit usr_home/production
+# Run specific infrastructure prep
+task infrastructure_cluster_prep
 
-# 2. Edit configuration
-cd usr_home/production
-vim config.yml                    # Set IPs and credentials
-vim group_vars/basekit.yml        # Set profile and image versions
+# Run node preparation
+task run-node-prep
 
-# 3. Validate
-cd ../..
-python3 onboarder-run.py --env=production --validate-only
+# Deploy onboarder
+task run-onboarder
+```
 
-# 4. Deploy
-python3 onboarder-run.py --env=production
+### Checking Status
+```bash
+# View task state
+cat .cache/state.json
+
+# View logs
+ls -lh .cache/logs/
+tail -f .cache/logs/task_copy-ssh-key.log
 ```
 
 ### Resuming After Failure
-
 ```bash
-# 1. Check what failed
-cat usr_home/production/logs/state.json
-cat usr_home/production/logs/<failed_step>.log
-
-# 2. Fix the issue (update config, fix network, etc.)
-
-# 3. Resume from where it stopped
-python3 onboarder-run.py --env=production --resume
+# State is automatically tracked
+# Just re-run the task - it will skip completed subtasks
+task deploy-mcm
 ```
 
-### Multiple Environments
+## Documentation
 
+### For New Users
+Start here:
+1. [Requirements](REQUIREMENTS.md) - What you need installed
+2. [Getting Started](GETTING_STARTED.md) - Step-by-step first deployment
+3. [Configuration](CONFIGURATION.md) - How to configure your environment
+
+### For Operators
+Day-to-day usage:
+1. [Configuration](CONFIGURATION.md) - Configuration reference
+2. [Profiles](PROFILES.md) - Understanding workflows
+3. [Troubleshooting](TROUBLESHOOTING.md) - Fixing common issues
+
+### For Developers
+Understanding the system:
+1. [Overview](OVERVIEW.md) - High-level architecture
+2. [Architecture](ARCHITECTURE.md) - Technical details
+3. [Profiles](PROFILES.md) - Creating custom profiles
+
+## Common Tasks
+
+### View Available Tasks
 ```bash
-# Deploy to different environments
-python3 onboarder-run.py --env=dev
-python3 onboarder-run.py --env=staging  
-python3 onboarder-run.py --env=production
+# List all tasks
+task --list
+
+# List tasks with descriptions
+task --list-all
 ```
 
-## 🚧 Creating Custom Profiles
+### Check Task Dependencies
+```bash
+# See what a task will run
+task --dry deploy-mcm
+```
 
-### 1. Create Profile File
+### Reset State
+```bash
+# Clear completed task tracking
+rm .cache/state.json
 
-`data/profiles/basekit/custom.yml`:
+# Tasks will re-run from beginning
+```
+
+### Debug Task Execution
+```bash
+# View task log
+tail -f .cache/logs/task_<task-id>.log
+
+# Check Ansible inventory
+ansible-inventory -i config.yml --list
+```
+
+## Deployment Phases
+
+### Phase 1: Infrastructure Prep (prep)
+- Prepare onboarder container
+- Set up deployment environment
+- Validate configurations
+
+### Phase 2: MCM Deployment (deploy-mcm)
+- Copy SSH keys to infrastructure nodes
+- Prepare nodes (OS configuration)
+- Deploy RKE2 Kubernetes cluster
+- Configure cluster networking
+
+### Phase 3: OSMS Deployment (deploy-prod-osms)
+- Prepare downstream cluster nodes
+- Deploy OSMS cluster via Rancher
+- Configure OSMS-specific settings
+
+### Phase 4: OSDC Deployment (deploy-prod-osdc)
+- Prepare downstream cluster nodes
+- Deploy OSDC cluster via Rancher
+- Configure OSDC-specific settings
+
+## Support
+
+### Getting Help
+
+1. **Check Logs**: Start with `.cache/logs/` directory
+2. **Review State**: Check `.cache/state.json` for completed tasks
+3. **Documentation**: See individual documentation files
+4. **Troubleshooting**: Refer to [TROUBLESHOOTING.md](TROUBLESHOOTING.md)
+
+### Reporting Issues
+
+When reporting problems, include:
+- Task command that failed
+- Relevant log file from `.cache/logs/`
+- State file `.cache/state.json`
+- Environment configuration (sanitize secrets!)
+- Container and host OS details
+
+## Key Concepts
+
+### Taskfile Orchestration
+Workflows are defined in Taskfile.yml using a hierarchical task structure:
 ```yaml
-metadata:
-  name: "My Custom Profile"
-  version: "1.0.0"
-  description: "Custom deployment workflow"
-  profile_kind: basekit
-
-steps:
-  - id: custom_step
-    description: "My custom step"
-    kind: ansible
-    file: "tasks/basekit/my-custom-task.yml"
-    timeout: 600
+tasks:
+  prep:
+    desc: Complete environment preparation
+    cmds:
+      - task: prep-onboarder-container
+      - task: run-deployment-setup
 ```
 
-### 2. Reference in Environment
+### Task Execution with State Management
+Tasks are executed via run_task.py which provides:
+- **State tracking**: Completed tasks are recorded in `.cache/state.json`
+- **Logging**: Each task logs to `.cache/logs/task_<id>.log`
+- **Idempotency**: Safe to re-run, skips completed tasks
+- **Real-time output**: Stream logs as tasks execute
 
-`usr_home/my_env/group_vars/basekit.yml`:
+### Included Taskfiles
+Complex deployments are broken into modules:
 ```yaml
-profile_kind: "basekit"
-profile_name: "custom"  # ← Use your custom profile
+includes:
+  deployment:
+    taskfile: ../../data/basekit/1.0.1/main.yml
+    vars:
+      DATA_DIR: /docker-workspace/data
 ```
 
-### 3. Deploy
+### Variable Passing
+Variables flow through task hierarchies:
+```yaml
+vars:
+  HOSTS: infrastructure_cluster
+cmds:
+  - task: subtask
+    vars:
+      HOSTS: '{{.HOSTS}}'  # Pass through
+```
 
+## Support
+
+### Getting Help
+
+1. **Check Documentation**: Start with [Troubleshooting](TROUBLESHOOTING.md)
+2. **Review Logs**: Check `usr_home/<env>/logs/`
+3. **Validate Configuration**: Run with `--validate-only`
+4. **Enable Verbose Mode**: Use `--verbose` flag
+
+### Reporting Issues
+
+When reporting problems, include:
+- Full error message
+- Relevant logs (sanitize secrets!)
+- Configuration files (sanitize secrets!)
+- Environment details (OS, Python version, etc.)
+
+### Contributing
+
+See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines on:
+- Adding new profiles
+- Creating tasks
+- Improving documentation
+- Submitting bug fixes
+
+## Security Notes
+
+### SSH Key Management
 ```bash
-python3 onboarder-run.py --env=my_env
+# Always set proper permissions
+chmod 700 .ssh
+chmod 600 .ssh/*_rsa
+chmod 644 .ssh/*_rsa.pub
 ```
 
-## 🎨 Features
+### Container Isolation
+- All deployments run in isolated container
+- Host system remains unaffected
+- SSH keys mounted read-only
+- Logs persist on host
 
-- ✅ **Configuration-driven** - All logic in `data/`, all config in `usr_home/`
-- ✅ **Variable substitution** - Use `{env}`, `{profile}`, and custom variables
-- ✅ **Validation** - Catch errors before running
-- ✅ **Idempotent** - Safe to run multiple times
-- ✅ **Resumable** - Continue from last successful step
-- ✅ **Progress tracking** - State saved after each step
-- ✅ **Multiple profiles** - basekit, baremetal, aws
-- ✅ **Container isolation** - Consistent execution environment
-- ✅ **Detailed logging** - Per-step logs + main orchestrator log
-- ✅ **STIG-compatible** - Works with hardened RHEL 9 systems
-- ✅ **Clean output** - Easy to see progress at a glance
+### Ansible Inventory
+```yaml
+# Use SSH keys (recommended)
+ansible_ssh_private_key_file: /docker-workspace/config/install/.ssh/rancher_ssh_key
 
-## 🤝 Contributing
+# Avoid plaintext passwords in version control
+# Use ansible-vault or external secrets management
+```
 
-### Adding a New Step
+## Version History
 
-1. Create the task file in `data/tasks/<profile>/`
-2. Add to profile: `data/profiles/<profile>/<name>.yml`
-3. Test with `--validate-only`
+### v1.0.1 - Current Release
+- Taskfile-based orchestration
+- run_task.py for state management
+- Real-time log streaming
+- Modular taskfile includes
+- Support for MCM, OSMS, OSDC deployments
+- Air-gapped environment support
 
-### Adding a New Profile Type
+## Architecture Overview
 
-1. Create directory: `data/profiles/<new_type>/`
-2. Create profile: `data/profiles/<new_type>/default.yml`
-3. Create tasks in: `data/tasks/<new_type>/`
-4. Test with sample environment
+```
+Environment Taskfile.yml
+    ↓
+Included Taskfiles (basekit/main.yml, cluster_deployment/main.yml)
+    ↓
+run_task.py (state tracking, logging)
+    ↓
+Task Execution (Ansible playbooks, shell commands)
+    ↓
+State Saved (.cache/state.json)
+```
 
-## 📖 Version History
-
-- **v1.0.0** - Initial release with basekit profile
-  - Python-based orchestrator
-  - Profile system
-  - Validation and resume capabilities
-  - STIG-compatible Ansible configuration
+**Key Components:**
+- **Taskfile.yml**: Main workflow orchestration
+- **run_task.py**: Execution engine with state management
+- **Ansible playbooks**: Infrastructure automation
+- **State tracking**: Resume capability
 
 ---
 
-**Need Help?** Check the logs in `usr_home/<env>/logs/` or run with `--verbose` for detailed output.
+**Ready to get started?** Head to [Getting Started](docs/GETTING_STARTED.md)!
+
+**Need help?** Check out [Troubleshooting](docs/TROUBLESHOOTING.md)!
+
+**Last Updated**: November 2025  
+**Version**: 1.0.1  
+**Maintained By**: Infrastructure Team

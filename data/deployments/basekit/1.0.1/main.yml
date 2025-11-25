@@ -1,6 +1,38 @@
 version: '3'
 
 tasks:
+  prep-config:
+    desc: "Generate configuration files from deployment.yml"
+    summary: |
+      Generates all configuration files from a single deployment.yml source file.
+      
+      This task:
+        - Loads deployment.yml from the environment directory
+        - Validates the configuration structure
+        - Ensures .ssh directory exists
+        - Generates missing SSH keys (RSA 4096-bit)
+        - Creates Ansible inventory (config.yml)
+        - Generates group_vars/all.yml
+        - Generates group_vars/deployment.yml
+        - Generates host_vars/mgmt_kvm.yml
+        - Optionally generates Taskfile.yml
+        - Validates all generated files
+      
+      Usage:
+        task prep-config
+      
+      The deployment.yml file should exist at: config/<env-name>/deployment.yml
+    
+    cmds:
+      - python3 {{`{{.DATA_DIR}}`}}/run_task.py 
+          --task-id=prep-config 
+          --hosts=localhost 
+          --file={{`{{.DATA_DIR}}`}}/{{`{{.DEPLOYMENT_TYPE}}`}}/{{`{{.DEPLOYMENT_VERSION}}`}}/tasks/generate_config.yml 
+          --kind=ansible
+          --extra-vars="env_name={{`{{.ENV_NAME}}`}}"
+    
+    silent: false
+    
   copy-ssh-key-mgmt:
     desc: Copy SSH Key to Management KVM
     cmds:

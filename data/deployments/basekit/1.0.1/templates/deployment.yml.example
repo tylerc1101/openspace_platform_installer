@@ -1,0 +1,240 @@
+---
+# ==============================================================================
+# OpenSpace Platform Deployment Configuration
+# ==============================================================================
+# This is the SINGLE SOURCE OF TRUTH for your OpenSpace deployment
+# 
+# All other configuration files are GENERATED from this file:
+#   - config.yml (Ansible inventory)
+#   - group_vars/all.yml
+#   - group_vars/deployment.yml
+#   - host_vars/mgmt_kvm.yml
+#   - Taskfile.yml
+# 
+# To generate configuration files, run: task prep-config
+# 
+# DO NOT EDIT THE GENERATED FILES - They will be overwritten!
+# ==============================================================================
+
+# ==============================================================================
+# DEPLOYMENT METADATA
+# ==============================================================================
+deployment:
+  name: "skcp_bottom"                    # Unique deployment name
+  type: "basekit"                        # Deployment type (basekit, etc)
+  version: "1.0.1"                       # Deployment version
+  onboarder_version: "3.5.0-rc7"        # Onboarder version to use
+  osms_tooling_version: "1.8.x"         # OSMS tooling version
+
+# ==============================================================================
+# SSH CONFIGURATION
+# ==============================================================================
+# SSH keys will be automatically generated if they don't exist in .ssh/ directory
+ssh:
+  user: "kratos"                         # SSH user for all hosts
+  
+  # SSH key filenames (will be created in .ssh/ directory)
+  keys:
+    onboarder: "onboarder_ssh_key"       # For onboarder operations
+    mcm: "mcm_ssh_key"                   # For MCM cluster nodes
+    osms: "osms_ssh_key"                 # For OSMS cluster nodes
+    osdc: "osdc_ssh_key"                 # For OSDC cluster nodes
+    rancher: "rancher_ssh_key"           # For Rancher access
+
+# ==============================================================================
+# NETWORK CONFIGURATION
+# ==============================================================================
+networks:
+  # Customer/WAN Network
+  customer:
+    gateway: "10.243.76.1"               # WAN gateway IP
+    cidr: "/23"                          # CIDR notation
+    dns_servers:                         # DNS servers for customer network
+      - "10.243.25.50"
+      - "10.243.25.53"
+  
+  # Management Network (Internal)
+  management:
+    network: "192.168.2"                 # Management network base (last octet omitted)
+    cidr: "/24"                          # CIDR notation
+    gateway: "192.168.2.1"               # Management gateway (usually OPNsense)
+    dns_servers:                         # DNS servers for management network
+      - "192.168.2.1"
+  
+  # iDRAC/BMC Network
+  idrac:
+    network: "192.168.0"                 # iDRAC network base (last octet omitted)
+    cidr: "/24"                          # CIDR notation
+    gateway: "192.168.0.1"               # iDRAC gateway
+
+# ==============================================================================
+# DOMAIN CONFIGURATION
+# ==============================================================================
+domain:
+  base: "base-kit-1.kratos"              # Base domain for all services
+
+# ==============================================================================
+# NTP CONFIGURATION
+# ==============================================================================
+ntp:
+  server: "192.168.2.100"                # NTP server IP or hostname
+  timezone: "Etc/UTC"                    # Timezone (use standard TZ format)
+
+# ==============================================================================
+# INFRASTRUCTURE HOSTS
+# ==============================================================================
+infrastructure:
+  # Management Hypervisor (KVM host)
+  mgmt_kvm:
+    wan_ip: "10.243.77.211"              # Customer/WAN IP address
+    wan_interface: "eno12409"            # Customer/WAN interface name
+    mgmt_ip: "192.168.2.6"               # Management network IP
+    mgmt_interface: "eno12399"           # Management interface name
+    idrac_ip: "192.168.0.4"              # iDRAC IP address
+    idrac_interface: "ens3f0"            # iDRAC interface name
+    prov_interface: "eno8303"            # Provisioning interface name
+  
+  # OPNsense Firewall/Router
+  opnsense:
+    wan_ip: "10.243.77.221"              # Customer/WAN IP address
+    mgmt_ip: "192.168.2.1"               # Management network IP (serves as gateway)
+
+# ==============================================================================
+# CLUSTER DEFINITIONS
+# ==============================================================================
+# Clusters are organized into three groups:
+#   - management_cluster: Infrastructure/management clusters (MCM)
+#   - openspace_management_system: OSMS clusters
+#   - openspace_datapath_cluster: OSDC clusters
+#
+# Each group can contain multiple clusters, allowing for flexible deployments
+# ==============================================================================
+
+clusters:
+  # --------------------------------------------------------------------------
+  # MCM - Infrastructure/Management Cluster
+  # --------------------------------------------------------------------------
+  # The management cluster runs Rancher MCM and manages downstream clusters
+  management_cluster:
+    clusters:
+      - cluster_name: "local"            # Rancher cluster name
+        ssh_key: "mcm_ssh_key"           # SSH key filename (from ssh.keys above)
+        nodes:
+          - name: "mcm1"                 # Node hostname
+            mgmt_ip: "192.168.2.8"       # Management network IP
+            mgmt_interface: "enp1s0"     # Management interface
+            idrac_ip: "192.168.0.8"      # iDRAC IP
+            roles:                       # Node roles
+              - "controlplane"
+              - "etcd"
+              - "worker"
+  
+  # --------------------------------------------------------------------------
+  # OSMS - OpenSpace Management System
+  # --------------------------------------------------------------------------
+  # The OSMS cluster runs OpenSpace management and control plane services
+  # You can add multiple OSMS clusters here if needed
+  openspace_management_system:
+    clusters:
+      - cluster_name: "openspace-osms"   # Kubernetes cluster name
+        ssh_key: "osms_ssh_key"          # SSH key filename (from ssh.keys above)
+        deployment_yaml: "osms_deployment.yml"  # OSMS deployment configuration file
+        nodes:
+          - name: "osms1"                # Node hostname
+            mgmt_ip: "192.168.2.9"       # Management network IP
+            mgmt_interface: "enp1s0"     # Management interface
+            idrac_ip: "192.168.0.9"      # iDRAC IP
+            roles:                       # Node roles
+              - "controlplane"
+              - "etcd"
+              - "worker"
+  
+  # --------------------------------------------------------------------------
+  # OSDC - OpenSpace Data Cluster
+  # --------------------------------------------------------------------------
+  # The OSDC cluster runs tenant workloads and data services
+  # You can add multiple OSDC clusters here for multi-cluster deployments
+  openspace_datapath_cluster:
+    clusters:
+      - cluster_name: "openspace-osdc"   # Kubernetes cluster name
+        ssh_key: "osdc_ssh_key"          # SSH key filename (from ssh.keys above)
+        deployment_yaml: "osdc_deployment.yml"  # OSDC deployment configuration file
+        nodes:
+          - name: "osdc1"                # Node hostname (controlplane + worker)
+            mgmt_ip: "192.168.2.16"      # Management network IP
+            mgmt_interface: "enp1s0"     # Management interface
+            idrac_ip: "192.168.0.16"     # iDRAC IP
+            mac_address: "30:3E:A7:2E:3A:8B"  # MAC address (for PXE boot)
+            roles:                       # Node roles
+              - "controlplane"
+              - "etcd"
+              - "worker"
+          
+          - name: "osdc2"                # Node hostname (worker only)
+            mgmt_ip: "192.168.2.17"      # Management network IP
+            mgmt_interface: "enp1s0"     # Management interface
+            idrac_ip: "192.168.0.17"     # iDRAC IP
+            mac_address: "30:3E:A7:2E:3A:8C"  # MAC address (for PXE boot)
+            roles:                       # Node roles
+              - "worker"
+      
+      # Example: Adding a second OSDC cluster (uncomment to use)
+      # - cluster_name: "openspace-osdc-2"
+      #   ssh_key: "osdc_ssh_key"
+      #   deployment_yaml: "osdc2_deployment.yml"
+      #   nodes:
+      #     - name: "osdc3"
+      #       mgmt_ip: "192.168.2.18"
+      #       mgmt_interface: "enp1s0"
+      #       idrac_ip: "192.168.0.18"
+      #       mac_address: "30:3E:A7:2E:3A:8D"
+      #       roles: ["controlplane", "etcd", "worker"]
+      #     - name: "osdc4"
+      #       mgmt_ip: "192.168.2.19"
+      #       mgmt_interface: "enp1s0"
+      #       idrac_ip: "192.168.0.19"
+      #       mac_address: "30:3E:A7:2E:3A:8E"
+      #       roles: ["worker"]
+
+# ==============================================================================
+# VIRTUAL IP ADDRESSES
+# ==============================================================================
+# These VIPs are used for cluster access and load balancing
+vips:
+  osdc: "192.168.2.249"                  # OSDC ingress VIP
+  osms: "192.168.2.250"                  # OSMS ingress VIP
+  api_osdc: "192.168.2.251"              # OSDC Kubernetes API VIP
+  api_osms: "192.168.2.252"              # OSMS Kubernetes API VIP
+  api_mcm: "192.168.2.253"               # MCM Rancher API VIP
+  mcm_wildcard: "192.168.2.254"          # MCM wildcard DNS VIP
+
+# ==============================================================================
+# STORAGE CONFIGURATION
+# ==============================================================================
+storage:
+  # NFS Storage (Optional)
+  nfs:
+    enabled: false                       # Enable NFS storage
+    server: "192.168.2.100"              # NFS server IP (if enabled)
+    path: "/exports/openspace"           # NFS export path (if enabled)
+
+# ==============================================================================
+# NOTES
+# ==============================================================================
+# 
+# IMPORTANT REMINDERS:
+#   - This is your ONLY configuration file - keep it in version control
+#   - All other config files are GENERATED - don't edit them
+#   - SSH keys are auto-generated if missing - deploy public keys to hosts
+#   - Run 'task prep-config' after making changes to regenerate files
+# 
+# WORKFLOW:
+#   1. Copy this file to: environments/<your-env>/deployment.yml
+#   2. Edit the values for your environment
+#   3. Run: cd /docker-workspace && ln -s environments/<your-env> config/<your-env>
+#   4. Run: cd config/<your-env> && task prep-config
+#   5. Review generated files
+#   6. Run: task prep
+#   7. Run: task deploy-mcm
+# 
+# ==============================================================================

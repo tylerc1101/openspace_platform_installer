@@ -25,7 +25,6 @@ osms_tooling_version: "{{ deployment.osms_tooling_version }}"
 # Domain Configuration
 # ==============================================================================
 domain_name: "{{ domain.base }}"
-base_domain: "{{ domain.base }}"
 
 # ==============================================================================
 # Network Configuration
@@ -48,27 +47,62 @@ idrac_cidr: "{{ networks.idrac.cidr }}"
 idrac_gateway: "{{ networks.idrac.gateway }}"
 
 # ==============================================================================
+# Cluster Configuration
+# ==============================================================================
+
+# Management Cluster (MCM)
+{% if clusters.management_cluster is defined %}
+{% for cluster in clusters.management_cluster.clusters %}
+mcm_cluster_name: "{{ cluster.cluster_name }}"
+mcm_nodes:
+{% for node in cluster.nodes %}
+  - name: "{{ node.name }}"
+    mgmt_ip: "{{ node.mgmt_ip }}"
+    roles: {{ node.roles | to_json }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+# OpenSpace Management System (OSMS)
+{% if clusters.openspace_management_system is defined %}
+{% for cluster in clusters.openspace_management_system.clusters %}
+osms_cluster_name: "{{ cluster.cluster_name }}"
+{% if cluster.deployment_yaml is defined %}
+osms_deployment_yaml: "{{ cluster.deployment_yaml }}"
+{% endif %}
+osms_nodes:
+{% for node in cluster.nodes %}
+  - name: "{{ node.name }}"
+    mgmt_ip: "{{ node.mgmt_ip }}"
+    roles: {{ node.roles | to_json }}
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+# OpenSpace Data Cluster (OSDC)
+{% if clusters.openspace_datapath_cluster is defined %}
+{% for cluster in clusters.openspace_datapath_cluster.clusters %}
+osdc_cluster_name: "{{ cluster.cluster_name }}"
+{% if cluster.deployment_yaml is defined %}
+osdc_deployment_yaml: "{{ cluster.deployment_yaml }}"
+{% endif %}
+osdc_nodes:
+{% for node in cluster.nodes %}
+  - name: "{{ node.name }}"
+    mgmt_ip: "{{ node.mgmt_ip }}"
+    roles: {{ node.roles | to_json }}
+{% if node.mac_address is defined %}
+    mac_address: "{{ node.mac_address }}"
+{% endif %}
+{% endfor %}
+{% endfor %}
+{% endif %}
+
+# ==============================================================================
 # NTP Configuration
 # ==============================================================================
 ntp_server: "{{ ntp.server }}"
 ntp_timezone: "{{ ntp.timezone }}"
-
-# ==============================================================================
-# Virtual IP Addresses
-# ==============================================================================
-{% if vips is defined %}
-# OSDC Cluster VIPs
-vip_osdc: "{{ vips.osdc | default('') }}"
-vip_api_osdc: "{{ vips.api_osdc | default('') }}"
-
-# OSMS Cluster VIPs
-vip_osms: "{{ vips.osms | default('') }}"
-vip_api_osms: "{{ vips.api_osms | default('') }}"
-
-# MCM Cluster VIPs
-vip_api_mcm: "{{ vips.api_mcm | default('') }}"
-vip_mcm_wildcard: "{{ vips.mcm_wildcard | default('') }}"
-{% endif %}
 
 # ==============================================================================
 # Storage Configuration
@@ -83,11 +117,3 @@ nfs_path: "{{ storage.nfs.path }}"
 {% endif %}
 {% endif %}
 {% endif %}
-
-# ==============================================================================
-# Ansible Configuration
-# ==============================================================================
-ansible_python_interpreter: /usr/bin/python3
-
-# SSH Configuration
-ansible_ssh_common_args: '-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'

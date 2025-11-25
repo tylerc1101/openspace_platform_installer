@@ -12,7 +12,7 @@
   
   vars:
     env_name: "{{ env_name | mandatory }}"
-    env_dir: "/docker-workspace/config/{{ env_name }}"
+    env_dir: "/docker-workspace/config/install"
     deployment_config: "{{ env_dir }}/deployment.yml"
     ssh_dir: "{{ env_dir }}/.ssh"
     templates_dir: "/docker-workspace/data/deployments/{{ deployment_type }}/{{ deployment_version }}/templates"
@@ -64,89 +64,9 @@
         deployment_version: "{{ config.deployment.version }}"
     
     # ==========================================================================
-    # PHASE 2: SSH Directory and Key Management
+    # PHASE 2: Create Directory Structure
     # ==========================================================================
-    - name: "PHASE 2: SSH Key Management"
-      debug:
-        msg: "Checking and generating SSH keys in {{ ssh_dir }}"
-    
-    - name: Ensure .ssh directory exists
-      file:
-        path: "{{ ssh_dir }}"
-        state: directory
-        mode: '0700'
-    
-    - name: Check which SSH keys exist
-      stat:
-        path: "{{ ssh_dir }}/{{ item.value }}"
-      register: ssh_key_stats
-      loop: "{{ config.ssh.keys | dict2items }}"
-      loop_control:
-        label: "{{ item.key }}: {{ item.value }}"
-    
-    - name: Generate missing SSH keys
-      openssh_keypair:
-        path: "{{ ssh_dir }}/{{ item.item.value }}"
-        type: rsa
-        size: 4096
-        comment: "{{ config.deployment.name }}-{{ item.item.key }}"
-        state: present
-        mode: '0600'
-      loop: "{{ ssh_key_stats.results }}"
-      loop_control:
-        label: "{{ item.item.key }}: {{ item.item.value }}"
-      when: not item.stat.exists
-      register: generated_keys
-    
-    - name: Display SSH key generation summary
-      debug:
-        msg: |
-          SSH Key Status:
-          {% for item in ssh_key_stats.results %}
-          - {{ item.item.key }}: {{ 'EXISTS' if item.stat.exists else 'GENERATED' }}
-          {% endfor %}
-    
-    - name: Set proper permissions on all SSH keys
-      file:
-        path: "{{ ssh_dir }}/{{ item.value }}"
-        mode: '0600'
-      loop: "{{ config.ssh.keys | dict2items }}"
-      loop_control:
-        label: "{{ item.key }}: {{ item.value }}"
-    
-    - name: Display public keys for new installations
-      block:
-        - name: Read public key contents
-          slurp:
-            src: "{{ ssh_dir }}/{{ item.item.value }}.pub"
-          register: public_keys
-          loop: "{{ ssh_key_stats.results }}"
-          loop_control:
-            label: "{{ item.item.key }}"
-          when: not item.stat.exists
-        
-        - name: Display public keys that need to be deployed
-          debug:
-            msg: |
-              
-              ========================================================================
-              PUBLIC KEYS GENERATED - Deploy these to target hosts
-              ========================================================================
-              {% for item in public_keys.results | default([]) %}
-              {% if item.content is defined %}
-              
-              {{ item.item.item.key | upper }} Key:
-              {{ item.content | b64decode }}
-              {% endif %}
-              {% endfor %}
-              ========================================================================
-          when: public_keys.results | selectattr('content', 'defined') | list | length > 0
-      when: generated_keys.changed
-    
-    # ==========================================================================
-    # PHASE 3: Create Directory Structure
-    # ==========================================================================
-    - name: "PHASE 3: Directory Structure"
+    - name: "PHASE 2: Directory Structure"
       debug:
         msg: "Creating configuration directory structure"
     
@@ -167,18 +87,24 @@
         path: "{{ env_dir }}/.cache/generated"
         state: directory
         mode: '0755'
+
+    - name: Ensure .ssh directory exists
+      file:
+        path: "{{ ssh_dir }}"
+        state: directory
+        mode: '0700'
     
     # ==========================================================================
-    # PHASE 4: Generate Ansible Inventory
+    # PHASE 3: Generate Ansible Inventory
     # ==========================================================================
-    - name: "PHASE 4: Generate Ansible Inventory"
+    - name: "PHASE 3: Generate Ansible Inventory"
       debug:
-        msg: "Generating config.yml from template"
+        msg: "Generating inventory.yml from template"
     
-    - name: Generate Ansible inventory (config.yml)
+    - name: Generate Ansible inventory (inventory.yml)
       template:
         src: "{{ templates_dir }}/inventory.yml.j2"
-        dest: "{{ env_dir }}/config.yml"
+        dest: "{{ env_dir }}/inventory.yml"
         mode: '0644'
       vars:
         deployment: "{{ config.deployment }}"
@@ -191,9 +117,9 @@
         vips: "{{ config.vips | default({}) }}"
     
     # ==========================================================================
-    # PHASE 5: Generate group_vars Files
+    # PHASE 4: Generate group_vars Files
     # ==========================================================================
-    - name: "PHASE 5: Generate group_vars"
+    - name: "PHASE 4: Generate group_vars"
       debug:
         msg: "Generating group_vars files from templates"
     
@@ -221,9 +147,9 @@
         clusters: "{{ config.clusters }}"
     
     # ==========================================================================
-    # PHASE 6: Generate host_vars Files
+    # PHASE 5: Generate host_vars Files
     # ==========================================================================
-    - name: "PHASE 6: Generate host_vars"
+    - name: "PHASE 5: Generate host_vars"
       debug:
         msg: "Generating host_vars files from templates"
     
@@ -237,9 +163,9 @@
         networks: "{{ config.networks }}"
     
     # ==========================================================================
-    # PHASE 7: Generate Taskfile (optional)
+    # PHASE 6: Generate Taskfile (optional)
     # ==========================================================================
-    - name: "PHASE 7: Generate Taskfile"
+    - name: "PHASE 6: Generate Taskfile"
       debug:
         msg: "Generating Taskfile.yml from template"
     
@@ -259,66 +185,9 @@
       when: taskfile_template.stat.exists
     
     # ==========================================================================
-    # PHASE 8: Record Generation Metadata
+    # PHASE 7: Validation
     # ==========================================================================
-    - name: "PHASE 8: Record Metadata"
-      debug:
-        msg: "Recording generation metadata"
-    
-    - name: Record generation timestamp and metadata
-      copy:
-        content: |
-          # Configuration Generation Metadata
-          # ==================================
-          
-          Generated at: {{ ansible_date_time.iso8601 }}
-          Generated by: {{ ansible_user_id }}@{{ ansible_hostname }}
-          
-          Source Configuration:
-            File: {{ deployment_config }}
-            Deployment Name: {{ config.deployment.name }}
-            Deployment Type: {{ config.deployment.type }}
-            Deployment Version: {{ config.deployment.version }}
-            Onboarder Version: {{ config.deployment.onboarder_version }}
-          
-          Generated Files:
-            - config.yml (Ansible inventory)
-            - group_vars/all.yml
-            - group_vars/deployment.yml
-            - host_vars/mgmt_kvm.yml
-            {% if taskfile_template.stat.exists %}- Taskfile.yml{% endif %}
-
-          
-          SSH Keys:
-          {% for key_name, key_file in config.ssh.keys.items() %}
-            - {{ key_name }}: {{ key_file }}
-          {% endfor %}
-          
-          Clusters Configured:
-          {% for cluster_name in config.clusters.keys() %}
-            - {{ cluster_name }}
-          {% endfor %}
-        dest: "{{ env_dir }}/.cache/generated/metadata.txt"
-        mode: '0644'
-    
-    - name: Create .gitignore for generated files
-      copy:
-        content: |
-          # Generated files - DO NOT COMMIT
-          # These files are generated from deployment.yml
-          # Run 'task prep-config' to regenerate
-          
-          config.yml
-          Taskfile.yml
-          group_vars/
-          host_vars/
-        dest: "{{ env_dir }}/.gitignore.generated"
-        mode: '0644'
-    
-    # ==========================================================================
-    # PHASE 9: Validation
-    # ==========================================================================
-    - name: "PHASE 9: Validate Generated Files"
+    - name: "PHASE 7: Validate Generated Files"
       debug:
         msg: "Validating generated configuration files"
     

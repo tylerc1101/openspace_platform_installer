@@ -21,74 +21,6 @@ all:
         # SSH Configuration
         # ======================================================================
         ansible_user: "{{ ssh.user }}"
-        ansible_ssh_private_key_file: ".ssh/{{ ssh.keys.onboarder }}"
-        
-        # ======================================================================
-        # Deployment Configuration
-        # ======================================================================
-        deployment_name: "{{ deployment.name }}"
-        deployment_type: "{{ deployment.type }}"
-        deployment_version: "{{ deployment.version }}"
-        onboarder_version: "{{ deployment.onboarder_version }}"
-        osms_tooling_version: "{{ deployment.osms_tooling_version }}"
-        
-        # ======================================================================
-        # Domain Configuration
-        # ======================================================================
-        domain_name: "{{ domain.base }}"
-        
-        # ======================================================================
-        # Network Configuration
-        # ======================================================================
-        customer_network:
-          gateway: "{{ networks.customer.gateway }}"
-          cidr: "{{ networks.customer.cidr }}"
-          dns_servers: {{ networks.customer.dns_servers | to_json }}
-        
-        mgmt_network:
-          network: "{{ networks.management.network }}"
-          cidr: "{{ networks.management.cidr }}"
-          gateway: "{{ networks.management.gateway }}"
-          dns_servers: {{ networks.management.dns_servers | to_json }}
-        
-        idrac_network:
-          network: "{{ networks.idrac.network }}"
-          cidr: "{{ networks.idrac.cidr }}"
-          gateway: "{{ networks.idrac.gateway }}"
-        
-        # ======================================================================
-        # NTP Configuration
-        # ======================================================================
-        ntp:
-          server: "{{ ntp.server }}"
-          timezone: "{{ ntp.timezone }}"
-        
-        # ======================================================================
-        # Virtual IPs
-        # ======================================================================
-{% if vips is defined %}
-        vip_osdc: "{{ vips.osdc | default('') }}"
-        vip_osms: "{{ vips.osms | default('') }}"
-        vip_api_osdc: "{{ vips.api_osdc | default('') }}"
-        vip_api_osms: "{{ vips.api_osms | default('') }}"
-        vip_api_mcm: "{{ vips.api_mcm | default('') }}"
-        vip_mcm_wildcard: "{{ vips.mcm_wildcard | default('') }}"
-{% endif %}
-        
-        # ======================================================================
-        # Clusters to Deploy
-        # ======================================================================
-        clusters_to_deploy:
-{% if clusters.openspace_management_system is defined %}
-{% for cluster in clusters.openspace_management_system.clusters %}
-          - {{ cluster.cluster_name | replace('-', '_') }}_production
-{% endfor %}
-{% endif %}
-{% if clusters.openspace_datapath_cluster is defined %}
-{% for cluster in clusters.openspace_datapath_cluster.clusters %}
-          - {{ cluster.cluster_name | replace('-', '_') }}_production
-{% endfor %}
-{% endif %}
 
       hosts:
         # ======================================================================
@@ -102,18 +34,9 @@ all:
         # ======================================================================
         opnsense:
           ansible_host: {{ infrastructure.opnsense.wan_ip }}
-          wan_ip: "{{ infrastructure.opnsense.wan_ip }}"
-          mgmt_ip: "{{ infrastructure.opnsense.mgmt_ip }}"
         
         mgmt_kvm:
           ansible_host: {{ infrastructure.mgmt_kvm.wan_ip }}
-          wan_address: "{{ infrastructure.mgmt_kvm.wan_ip }}"
-          wan_interface: "{{ infrastructure.mgmt_kvm.wan_interface }}"
-          mgmt_address: "{{ infrastructure.mgmt_kvm.mgmt_ip }}"
-          mgmt_interface: "{{ infrastructure.mgmt_kvm.mgmt_interface }}"
-          idrac_address: "{{ infrastructure.mgmt_kvm.idrac_ip }}"
-          idrac_interface: "{{ infrastructure.mgmt_kvm.idrac_interface }}"
-          prov_interface: "{{ infrastructure.mgmt_kvm.prov_interface }}"
       
       children:
         # ======================================================================
@@ -127,22 +50,11 @@ all:
             infrastructure_cluster:
               children:
 {% for cluster in clusters.management_cluster.clusters %}
-                {{ cluster.cluster_name | replace('-', '_') }}_production:
-                  vars:
-                    cluster_name: "{{ cluster.cluster_name }}"
-                    cluster_ssh_key: "{{ cluster.ssh_key }}"
-                    ansible_ssh_private_key_file: ".ssh/{{ cluster.ssh_key }}"
+                {{ cluster.cluster_name | replace('-', '_') }}:
                   hosts:
 {% for node in cluster.nodes %}
                     {{ node.name }}:
                       ansible_host: {{ node.mgmt_ip }}
-                      mgmt_address: "{{ node.mgmt_ip }}"
-                      mgmt_interface: "{{ node.mgmt_interface }}"
-                      idrac_address: "{{ node.idrac_ip }}"
-                      node_roles: {{ node.roles | to_json }}
-{% if node.mac_address is defined %}
-                      mac_address: "{{ node.mac_address }}"
-{% endif %}
 {% endfor %}
 {% endfor %}
             
@@ -158,25 +70,11 @@ all:
                   children:
 {% if clusters.openspace_management_system is defined %}
 {% for cluster in clusters.openspace_management_system.clusters %}
-                    {{ cluster.cluster_name | replace('-', '_') }}_production:
-                      vars:
-                        cluster_name: "{{ cluster.cluster_name }}"
-                        cluster_ssh_key: "{{ cluster.ssh_key }}"
-                        ansible_ssh_private_key_file: ".ssh/{{ cluster.ssh_key }}"
-{% if cluster.deployment_yaml is defined %}
-                        deployment_yaml: "{{ cluster.deployment_yaml }}"
-{% endif %}
+                    {{ cluster.cluster_name | replace('-', '_') }}:
                       hosts:
 {% for node in cluster.nodes %}
                         {{ node.name }}:
                           ansible_host: {{ node.mgmt_ip }}
-                          mgmt_address: "{{ node.mgmt_ip }}"
-                          mgmt_interface: "{{ node.mgmt_interface }}"
-                          idrac_address: "{{ node.idrac_ip }}"
-                          node_roles: {{ node.roles | to_json }}
-{% if node.mac_address is defined %}
-                          mac_address: "{{ node.mac_address }}"
-{% endif %}
 {% endfor %}
 {% endfor %}
 {% endif %}
@@ -188,25 +86,11 @@ all:
                   children:
 {% if clusters.openspace_datapath_cluster is defined %}
 {% for cluster in clusters.openspace_datapath_cluster.clusters %}
-                    {{ cluster.cluster_name | replace('-', '_') }}_production:
-                      vars:
-                        cluster_name: "{{ cluster.cluster_name }}"
-                        cluster_ssh_key: "{{ cluster.ssh_key }}"
-                        ansible_ssh_private_key_file: ".ssh/{{ cluster.ssh_key }}"
-{% if cluster.deployment_yaml is defined %}
-                        deployment_yaml: "{{ cluster.deployment_yaml }}"
-{% endif %}
+                    {{ cluster.cluster_name | replace('-', '_') }}:
                       hosts:
 {% for node in cluster.nodes %}
                         {{ node.name }}:
                           ansible_host: {{ node.mgmt_ip }}
-                          mgmt_address: "{{ node.mgmt_ip }}"
-                          mgmt_interface: "{{ node.mgmt_interface }}"
-                          idrac_address: "{{ node.idrac_ip }}"
-                          node_roles: {{ node.roles | to_json }}
-{% if node.mac_address is defined %}
-                          mac_address: "{{ node.mac_address }}"
-{% endif %}
 {% endfor %}
 {% endfor %}
 {% endif %}

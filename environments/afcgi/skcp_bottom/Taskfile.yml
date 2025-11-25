@@ -6,13 +6,8 @@ vars:
   
   DEPLOYMENT_TYPE: basekit
   DEPLOYMENT_VERSION: 1.0.1
-  DEPLOYMENT_PLAN: main.yml
 
   ONBOARDER_VERSION: 3.5.0-rc7
-  ONBOARDER_PLAN: main.yml
-  
-  NODE_PREP_PLAN: rhel9.yml
-  CLUSTER_DEPLOYMENT_PLAN: main.yml
 
 includes:
   deployment:
@@ -22,30 +17,15 @@ includes:
       DEPLOYMENT_TYPE: '{{.DEPLOYMENT_TYPE}}'
       DEPLOYMENT_VERSION: '{{.DEPLOYMENT_VERSION}}'
   
-  onboarder:
-    taskfile: '{{.DATA_DIR}}/onboarder/{{.ONBOARDER_VERSION}}/{{.ONBOARDER_PLAN}}'
-    vars:
-      DATA_DIR: '{{.DATA_DIR}}'
-      ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
-  
-  node-prep:
-    taskfile: '{{.DATA_DIR}}/node_prep/{{.ONBOARDER_VERSION}}/{{.NODE_PREP_PLAN}}'
-    vars:
-      DATA_DIR: '{{.DATA_DIR}}'
-      ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
-  
-  cluster-deployment:
-    taskfile: '{{.DATA_DIR}}/cluster_deployment/{{.ONBOARDER_VERSION}}/{{.CLUSTER_DEPLOYMENT_PLAN}}'
-    vars:
-      DATA_DIR: '{{.DATA_DIR}}'
-      ONBOARDER_VERSION: '{{.ONBOARDER_VERSION}}'
+  onboarder-tasks:
+    taskfile: '{{.DATA_DIR}}/onboarders/{{.ONBOARDER_VERSION}}/main.yml'
 
 tasks:
   # Phase 1: Prep
   prep-onboarder-container:
     desc: Prep Onboarder Container
     cmds:
-      - task: onboarder:prep-onboarder-container
+      - task: onboarder-tasks:prep-onboarder-container
 
   run-deployment-setup:
     desc: Run Deployment Setup Tasks

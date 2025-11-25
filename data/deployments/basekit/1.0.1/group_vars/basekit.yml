@@ -1,0 +1,62 @@
+# ==============================================================================
+# VIRTUAL IPs (Cluster Endpoints)
+# ==============================================================================
+vips:
+  osdc: "{{ networks.management.network }}.249"
+  osms: "{{ networks.management.network }}.250"
+  api_osdc: "{{ networks.management.network }}.251"
+  api_osms: "{{ networks.management.network }}.252"
+  api_mcm: "{{ networks.management.network }}.253"
+  mcm_wildcard: "{{ networks.management.network }}.254"
+
+host_paths:
+  # Libvirt/KVM paths
+  libvirt:
+    base: "/var/lib/libvirt"
+    images: "/var/lib/libvirt/images"
+    config: "/var/lib/libvirt/config"
+    vm_config: "/var/lib/libvirt/config/vm_config"
+
+  # OPNsense paths
+  opnsense:
+    config_dir: "/var/lib/libvirt/config/vm_config/opnsense"
+    config_xml: "/var/lib/libvirt/config/vm_config/opnsense/config.xml"
+    install_script: "/var/lib/libvirt/config/vm_config/opnsense/install_opnsense.sh"
+    iso_path: "/var/lib/libvirt/images/OPNsense-24.1-dvd-amd64.iso"
+
+  # Cluster VM paths
+  vms:
+    mcm: "/var/lib/libvirt/config/vm_config/mcm"
+    osms: "/var/lib/libvirt/config/vm_config/osms"
+    osdc: "/var/lib/libvirt/config/vm_config/osdc"
+
+ansible_paths:
+  # Generated configs
+  generated:
+    opnsense: "{{ container_paths.install_dir }}/generated/opnsense_config.xml"
+
+versions:
+  # Core components (from config.yml deployment section)
+  basekit: "{{ deployment.deployment_version }}"
+
+vm_defaults:
+  # VM resource specifications
+  mcm:
+    vcpus: 8
+    memory: 32768  # MB
+    disk_size: 200  # GB
+  
+  osms:
+    vcpus: 8
+    memory: 32768  # MB
+    disk_size: 200  # GB
+  
+  osdc:
+    vcpus: 16
+    memory: 65536  # MB
+    disk_size: 500  # GB
+  
+  opnsense:
+    vcpus: 4
+    memory: 8192  # MB
+    disk_size: 50  # GB

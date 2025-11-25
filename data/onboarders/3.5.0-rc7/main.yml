@@ -1,0 +1,161 @@
+version: '3'
+
+tasks:
+#=================================================================================#
+# Onboarder Tasks                                                                 #
+#=================================================================================#
+  run-onboarder:
+    desc: Run all Onboarder deployment steps
+    cmds:
+      - task: deploy-rke2-cluster
+      - task: bootstrap-container-images
+      - task: deploy-harbor
+      - task: load-darksite-bundles
+      - task: deploy-rancher
+      - task: terraform-rancher
+      - task: deploy-gitea
+      - task: deploy-argocd
+
+  onboarder-prep:
+    desc: Prepare Onboarder Environment
+    cmds:
+      - task: prep-onboarder-container
+
+  prep-onboarder-container:
+    desc: Prep Onboarder Container
+    vars:
+      HOSTS: localhost
+      FILE: './tasks/prep_onboarder_container.yml'
+      KIND: ansible
+    cmds:
+      - python3 ../../run_task.py --task-id=prep-onboarder-container --hosts={{.HOSTS}} --file={{.FILE}} --kind={{.KIND}}
+
+  deploy-rke2-cluster:
+    desc: Deploy RKE2 Cluster
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=deploy-rke2-cluster 
+          --kind=shell 
+          --command="cd /docker-workspace && make ansible-deploy-rke2-cluster ENVIRONMENT=install"
+
+  bootstrap-container-images:
+    desc: Bootstrap Container Images
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=bootstrap-container-images 
+          --kind=shell 
+          --command="cd /docker-workspace && make bootstrap-container-images-run ENVIRONMENT=install"
+
+  deploy-harbor:
+    desc: Deploy Harbor Registry
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=deploy-harbor 
+          --kind=shell 
+          --command="cd /docker-workspace && make helmfile-install HELMFILE_CHART=harbor ENVIRONMENT=install"
+
+  load-darksite-bundles:
+    desc: Load Darksite Bundles
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=load-darksite-bundles 
+          --kind=shell 
+          --command="cd /docker-workspace && make load-darksite-bundles ENVIRONMENT=install"
+
+  deploy-rancher:
+    desc: Deploy Rancher
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=deploy-rancher 
+          --kind=shell 
+          --command="cd /docker-workspace && make helmfile-install HELMFILE_CHART=rancher ENVIRONMENT=install"
+
+  terraform-rancher:
+    desc: Bootstrap Rancher with Terraform
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=terraform-rancher 
+          --kind=shell 
+          --command="cd /docker-workspace && make terraform-rancher-bootstrap-apply ENVIRONMENT=install"
+
+  deploy-gitea:
+    desc: Deploy Gitea
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=deploy-gitea 
+          --kind=shell 
+          --command="cd /docker-workspace && make install-gitea ENVIRONMENT=install"
+
+  deploy-argocd:
+    desc: Deploy ArgoCD
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=deploy-argocd 
+          --kind=shell 
+          --command="cd /docker-workspace && make install-argocd ENVIRONMENT=install"
+
+#=================================================================================#
+# Node Prep                                                                       #
+#=================================================================================#
+
+  node-prep:
+    desc: Cluster Node Prep
+    requires:
+      vars: [HOSTS]
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=configure-node-{{.HOSTS}} 
+          --hosts={{.HOSTS}} 
+          --file=./tasks/configure-node.yml 
+          --kind=ansible
+
+  install-rke2-selinux:
+    desc: Install RKE2 SELinux Package
+    requires:
+      vars: [HOSTS]
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=install-rke2-selinux-{{.HOSTS}} 
+          --hosts={{.HOSTS}} 
+          --file=./tasks/install_rke2-selinux.yml 
+          --kind=ansible
+
+  run-node-prep:
+    desc: Run All Node Prep Tasks
+    requires:
+      vars: [HOSTS]
+    cmds:
+      - task: node-prep
+        vars:
+          HOSTS: '{{.HOSTS}}'
+      - task: install-rke2-selinux
+        vars:
+          HOSTS: '{{.HOSTS}}'
+
+#=================================================================================#
+# Cluster Deployment                                                              #
+#=================================================================================#
+  
+  prep-cluster-nodes:
+    desc: Prepare Cluster Nodes for Deployment
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=prep-cluster-nodes-{{.HOSTS}} 
+          --hosts={{.HOSTS}} 
+          --file=./tasks/prep_cluster_nodes.yml 
+          --kind=ansible
+
+  deploy-clusters:
+    desc: Deploy OpenSpace Clusters
+    cmds:
+      - python3 ../../run_task.py 
+          --task-id=deploy-clusters-{{.HOSTS}} 
+          --hosts={{.HOSTS}} 
+          --file=./tasks/deploy_clusters.yml 
+          --kind=ansible
+
+  deploy-all:
+    desc: Run All Cluster Deployment Tasks
+    cmds:
+      - task: prep-cluster-nodes
+      - task: deploy-clusters

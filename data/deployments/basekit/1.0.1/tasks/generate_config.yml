@@ -12,9 +12,9 @@
   
   vars:
     env_name: "{{ env_name | mandatory }}"
-    env_dir: "/docker-workspace/config/install"
-    deployment_config: "{{ env_dir }}/deployment.yml"
-    ssh_dir: "{{ env_dir }}/.ssh"
+    install_dir: "/docker-workspace/config/install"
+    deployment_config: "{{ install_dir }}/deployment.yml"
+    ssh_dir: "{{ install_dir }}/.ssh"
     templates_dir: "/docker-workspace/data/deployments/{{ deployment_type }}/{{ deployment_version }}/templates"
   
   tasks:
@@ -72,19 +72,19 @@
     
     - name: Ensure group_vars directory exists
       file:
-        path: "{{ env_dir }}/group_vars"
+        path: "{{ install_dir }}/group_vars"
         state: directory
         mode: '0755'
     
     - name: Ensure host_vars directory exists
       file:
-        path: "{{ env_dir }}/host_vars"
+        path: "{{ install_dir }}/host_vars"
         state: directory
         mode: '0755'
     
     - name: Ensure cache directory exists
       file:
-        path: "{{ env_dir }}/.cache/generated"
+        path: "{{ install_dir }}/.cache/generated"
         state: directory
         mode: '0755'
 
@@ -104,7 +104,7 @@
     - name: Generate Ansible inventory (inventory.yml)
       template:
         src: "{{ templates_dir }}/inventory.yml.j2"
-        dest: "{{ env_dir }}/inventory.yml"
+        dest: "{{ install_dir }}/inventory.yml"
         mode: '0644'
       vars:
         deployment: "{{ config.deployment }}"
@@ -126,7 +126,7 @@
     - name: Generate group_vars/all.yml
       template:
         src: "{{ templates_dir }}/group_vars_all.yml.j2"
-        dest: "{{ env_dir }}/group_vars/all.yml"
+        dest: "{{ install_dir }}/group_vars/all.yml"
         mode: '0644'
       vars:
         deployment: "{{ config.deployment }}"
@@ -146,7 +146,7 @@
     - name: Generate host_vars/mgmt_kvm.yml
       template:
         src: "{{ templates_dir }}/host_vars_mgmt_kvm.yml.j2"
-        dest: "{{ env_dir }}/host_vars/mgmt_kvm.yml"
+        dest: "{{ install_dir }}/host_vars/mgmt_kvm.yml"
         mode: '0644'
       vars:
         mgmt_kvm: "{{ config.infrastructure.mgmt_kvm }}"
@@ -167,7 +167,7 @@
     - name: Generate Taskfile.yml
       template:
         src: "{{ templates_dir }}/taskfile.yml.j2"
-        dest: "{{ env_dir }}/Taskfile.yml"
+        dest: "{{ install_dir }}/Taskfile.yml"
         mode: '0644'
       vars:
         deployment: "{{ config.deployment }}"
@@ -182,7 +182,7 @@
         msg: "Validating generated configuration files"
     
     - name: Validate generated config.yml syntax
-      command: ansible-inventory -i {{ env_dir }}/config.yml --list
+      command: ansible-inventory -i {{ install_dir }}/config.yml --list
       register: inventory_validation
       changed_when: false
       failed_when: inventory_validation.rc != 0
@@ -190,5 +190,5 @@
     - name: Validate generated group_vars YAML syntax
       command: python3 -c "import yaml; yaml.safe_load(open('{{ item }}'))"
       loop:
-        - "{{ env_dir }}/group_vars/all.yml"
+        - "{{ install_dir }}/group_vars/all.yml"
       changed_when: false

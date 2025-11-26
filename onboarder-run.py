@@ -330,8 +330,7 @@ if [ -f "$GENERATOR_PLAYBOOK" ]; then
         -e "env_name=$ENV_NAME" \\
         -e "config_dir=$INSTALL_DIR" \\
         -e "deployment_file=$INSTALL_DIR/deployment.yml" \\
-        -c local \\
-        -i localhost,
+        -i "$INSTALL_DIR/inventory.yml",
     
     echo -e "${{GREEN}}  ✓ Configuration files generated${{NC}}"
 else

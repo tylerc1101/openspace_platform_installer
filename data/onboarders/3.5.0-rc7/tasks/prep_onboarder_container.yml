@@ -1,13 +1,5 @@
 - name: Prep Onboarder Container
   hosts: "{{ target_hosts | default('localhost')}}"
-  vars:
-    env_name: "{{ env_name | mandatory }}"
-    config_dir: "/docker-workspace/config"
-    env_dir: "{{ config_dir }}/{{ env_name }}"
-    sample_vsphere_dir: "{{ config_dir }}/sample-vsphere"
-    cache_dir: "{{ env_dir }}/.cache"
-    ssh_user: "{{ ansible_user }}"
-    common_dir: "{{ config_dir }}/common"
   
   tasks:
     # a) Build directories
@@ -32,8 +24,8 @@
     # b) Modify Makefiles
     - name: Deploy Makefile
       template:
-        src: ../files/basekit_makefile.j2
-        dest: "{{ env_dir }}/Makefile"
+        src: "{{ onboarder_dir }}/files/basekit_makefile.j2"
+        dest: "{{ install_dir }}/Makefile"
         owner: root
         group: root
         mode: '0644'
@@ -45,14 +37,14 @@
         line: "{{ item.replacement }}"
         backrefs: yes
       loop:
-        - { regexp: '^(SSH_USERNAME\s*\?=).*',      replacement: '\1 {{ ssh_user }}' }
+        - { regexp: '^(SSH_USERNAME\s*\?=).*',      replacement: '\1 {{ ansible_user }}' }
         - { regexp: '^(SSH_KEY_FILE_NAME\s*\?=).*', replacement: '\1 rancher_ssh_key' }
         - { regexp: '^(VM_NIC_INTERFACE\s*\?=).*',  replacement: '\1 enp1s0' }
 
     # c) Create terraform state file
     - name: Create vm-terraform.tfstate inside container
       template:
-        src: ../files/basekit_vm-terraform.tfstate.j2
+        src: "{{ onboarder_dir }}/files/basekit_vm-terraform.tfstate.j2"
         dest: "{{ cache_dir }}/vm-terraform.tfstate"
         owner: root
         group: root
@@ -61,7 +53,7 @@
     # d) Copy SSH Key into cache dir
     - name: Copy ssh_key into .cache directory
       copy:
-        src: "/docker-workspace/config/{{ env_name }}/.ssh/rancher_ssh_key"
+        src: "{{ install_dir }}/.ssh/rancher_ssh_key"
         dest: "{{ cache_dir }}/rancher_ssh_key"
         owner: root
         group: root

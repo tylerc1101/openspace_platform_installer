@@ -136,16 +136,6 @@
         vips: "{{ config.vips | default({}) }}"
         storage: "{{ config.storage | default({}) }}"
     
-    - name: Generate group_vars/deployment.yml
-      template:
-        src: "{{ templates_dir }}/group_vars_deployment.yml.j2"
-        dest: "{{ env_dir }}/group_vars/deployment.yml"
-        mode: '0644'
-      vars:
-        deployment: "{{ config.deployment }}"
-        vips: "{{ config.vips | default({}) }}"
-        clusters: "{{ config.clusters }}"
-    
     # ==========================================================================
     # PHASE 5: Generate host_vars Files
     # ==========================================================================
@@ -201,45 +191,4 @@
       command: python3 -c "import yaml; yaml.safe_load(open('{{ item }}'))"
       loop:
         - "{{ env_dir }}/group_vars/all.yml"
-        - "{{ env_dir }}/group_vars/deployment.yml"
       changed_when: false
-    
-    # ==========================================================================
-    # SUCCESS SUMMARY
-    # ==========================================================================
-    - name: Display success summary
-      debug:
-        msg: |
-          
-          ╔════════════════════════════════════════════════════════════════════╗
-          ║         Configuration Generation Completed Successfully!           ║
-          ╚════════════════════════════════════════════════════════════════════╝
-          
-          📁 Environment Directory: {{ env_dir }}
-          
-          ✅ Generated Files:
-             • config.yml              (Ansible inventory)
-             • group_vars/all.yml      (Global variables)
-             • group_vars/deployment.yml (Deployment variables)
-             • host_vars/mgmt_kvm.yml  (Management KVM host vars)
-             {% if taskfile_template.stat.exists %}• Taskfile.yml            (Task runner config){% endif %}
-
-          
-          🔑 SSH Keys: {{ ssh_dir }}/
-          {% for key_name, key_file in config.ssh.keys.items() %}
-             • {{ key_name }}: {{ key_file }}
-          {% endfor %}
-          
-          📋 Source: {{ deployment_config }}
-          
-          ⚠️  IMPORTANT:
-             All generated files are marked as GENERATED - DO NOT EDIT
-             To make changes, edit deployment.yml and run 'task prep-config'
-          
-          🚀 Next Steps:
-             1. Review generated files in {{ env_dir }}
-             2. If SSH keys were generated, deploy public keys to target hosts
-             3. Run: task prep
-             4. Run: task deploy-mcm
-          
-          ╚════════════════════════════════════════════════════════════════════╝

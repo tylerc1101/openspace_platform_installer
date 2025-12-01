@@ -56,8 +56,8 @@
     
     - name: Set deployment type and version for templates
       set_fact:
-        deployment_type: "{{ config.deployment.deployment_type }}"
-        deployment_version: "{{ config.deployment.deployment_version }}"
+        deployment_type: "{{ config.deployment.type }}"
+        deployment_version: "{{ config.deployment.version }}"
     
     # ==========================================================================
     # PHASE 2: Create Directory Structure
@@ -109,9 +109,11 @@
         domain: "{{ config.domain }}"
         ntp: "{{ config.ntp }}"
         infrastructure: "{{ config.infrastructure }}"
-        clusters: "{{ config.clusters }}"
+        management_cluster: "{{ config.management_cluster }}"
+        openspace_management_system: "{{ config.openspace_management_system }}"
+        openspace_datapath_cluster: "{{ config.openspace_datapath_cluster }}"
         vips: "{{ config.vips | default({}) }}"
-    
+
     # ==========================================================================
     # PHASE 4: Generate group_vars Files
     # ==========================================================================

@@ -13,121 +13,49 @@
 # Deployment: {{ deployment.name }}
 # ==============================================================================
 
+{% set data_dir = "/docker-workspace/data" %}
+
 version: '3'
 
-vars:
-  DEPLOYMENT_NAME: "{{ deployment.name }}"
-  DEPLOYMENT_TYPE: "{{ deployment.type }}"
-  DEPLOYMENT_VERSION: "{{ deployment.version }}"
-  ONBOARDER_VERSION: "{{ deployment.onboarder_version }}"
-
 includes:
-  deploy:
-    taskfile: /docker-workspace/data/deployments/{{ deployment.type }}/{{ deployment.version }}/main.yml
-    dir: /docker-workspace/config/{{ deployment.name }}
+  deployment:
+    taskfile: '{{ data_dir }}/deployments/{{ deployment.type }}/{{ deployment.version }}/main.yml'
+    vars:
+      DATA_DIR: '{{ data_dir }}'
+      DEPLOYMENT_TYPE: '{{ deployment.type }}'
+      DEPLOYMENT_VERSION: '{{ deployment.version }}'
+  
+  onboarder-tasks:
+    taskfile: '{{ data_dir }}/onboarders/{{ deployment.onboarder_version }}/main.yml'
 
 tasks:
   # ============================================================================
-  # Configuration Management
-  # ============================================================================
-  prep-config:
-    desc: "Regenerate all configuration files from deployment.yml"
-    cmds:
-      - python3 /docker-workspace/data/run_task.py 
-          --task-id=prep-config 
-          --hosts=localhost 
-          --file=/docker-workspace/data/deployments/{{ deployment.type }}/{{ deployment.version }}/tasks/generate_config.yml
-          --kind=ansible
-          --extra-vars="env_name={{ deployment.name }}"
-    silent: false
-
-  validate-config:
-    desc: "Validate generated configuration files"
-    cmds:
-      - echo "Validating Ansible inventory..."
-      - ansible-inventory -i config.yml --list > /dev/null
-      - echo "✓ Ansible inventory is valid"
-      - echo "Validating group_vars YAML..."
-      - python3 -c "import yaml; yaml.safe_load(open('group_vars/all.yml'))"
-      - python3 -c "import yaml; yaml.safe_load(open('group_vars/deployment.yml'))"
-      - echo "✓ group_vars YAML is valid"
-      - echo "Validating host_vars YAML..."
-      - python3 -c "import yaml; yaml.safe_load(open('host_vars/mgmt_kvm.yml'))"
-      - echo "✓ host_vars YAML is valid"
-      - echo ""
-      - echo "✅ All configuration files are valid!"
-
-  show-config:
-    desc: "Display current configuration summary"
-    cmds:
-      - |
-        echo "╔════════════════════════════════════════════════════════════════╗"
-        echo "║             Configuration Summary                              ║"
-        echo "╚════════════════════════════════════════════════════════════════╝"
-        echo ""
-        echo "Deployment: {{ deployment.name }}"
-        echo "Type: {{ deployment.type }}"
-        echo "Version: {{ deployment.version }}"
-        echo "Onboarder: {{ deployment.onboarder_version }}"
-        echo ""
-        echo "Configuration Files:"
-        echo "  Source: deployment.yml"
-        echo "  Generated: config.yml, group_vars/, host_vars/"
-        echo ""
-        echo "Clusters:"
-{% if clusters.management_cluster is defined %}
-{% for cluster in clusters.management_cluster.clusters %}
-        echo "  - {{ cluster.cluster_name }} (MCM)"
-{% endfor %}
-{% endif %}
-{% if clusters.openspace_management_system is defined %}
-{% for cluster in clusters.openspace_management_system.clusters %}
-        echo "  - {{ cluster.cluster_name }} (OSMS)"
-{% endfor %}
-{% endif %}
-{% if clusters.openspace_datapath_cluster is defined %}
-{% for cluster in clusters.openspace_datapath_cluster.clusters %}
-        echo "  - {{ cluster.cluster_name }} (OSDC)"
-{% endfor %}
-{% endif %}
-        echo ""
-
-  # ============================================================================
-  # Preparation Tasks
-  # ============================================================================
-  prep:
-    desc: "Complete environment preparation (generates configs, prepares container, etc)"
-    cmds:
-      - task: prep-config
-      - task: deploy:prep-onboarder-container
-      - task: deploy:run-deployment-setup
-
-  prep-onboarder-container:
-    desc: "Prepare onboarder container"
-    cmds:
-      - task: deploy:prep-onboarder-container
-
-  # ============================================================================
   # Deployment Tasks
   # ============================================================================
+  deploy-infra:
+    desc: "Deploys {{ deployment.type }} infrastructure"
+    cmds:
+      - task: deployment:deploy-all
+
   deploy-mcm:
     desc: "Deploy MCM (Management Cluster Manager)"
     cmds:
-      - task: deploy:deploy-mcm
+      - task: deployment:deploy-mcm
 
   deploy-osms:
     desc: "Deploy OSMS (OpenSpace Management System)"
     cmds:
-      - task: deploy:deploy-osms
+      - task: deployment:deploy-osms
 
   deploy-osdc:
     desc: "Deploy OSDC (OpenSpace Data Cluster)"
     cmds:
-      - task: deploy:deploy-osdc
+      - task: deployment:deploy-osdc
 
   deploy-all:
     desc: "Deploy all clusters (MCM → OSMS → OSDC)"
     cmds:
+      - task: deploy-infra
       - task: deploy-mcm
       - task: deploy-osms
       - task: deploy-osdc

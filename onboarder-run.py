@@ -356,10 +356,9 @@ if [ -f "$PREP_PLAYBOOK" ]; then
 
     # Run the prep playbook
     ansible-playbook "$PREP_PLAYBOOK" \\
+        -i "$INSTALL_DIR/inventory.yml" \\
         -e "env_name=$ENV_NAME" \\
-        -e "config_dir=$INSTALL_DIR" \\
-        -c local \\
-        -i localhost,
+        -e "target_hosts=localhost"
 
     echo -e "${{GREEN}}  ✓ Onboarder container prepared${{NC}}"
 else

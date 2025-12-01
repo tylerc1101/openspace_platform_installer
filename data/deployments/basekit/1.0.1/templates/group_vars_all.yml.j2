@@ -12,6 +12,11 @@
 # Generated: {{ ansible_date_time.iso8601 }}
 # ==============================================================================
 
+{% set data_dir = "/docker-workspace/data" %}
+{% set config_dir = "/docker-workspace/config" %}
+{% set install_dir = config_dir + "/install" %}
+{% set cache_dir = install_dir + "/.cache" %}
+
 # ==============================================================================
 # Deployment Information
 # ==============================================================================
@@ -51,8 +56,8 @@ idrac_gateway: "{{ networks.idrac.gateway }}"
 # ==============================================================================
 
 # Management Cluster (MCM)
-{% if clusters.management_cluster is defined %}
-{% for cluster in clusters.management_cluster.clusters %}
+{% if management_cluster is defined %}
+{% for cluster in management_cluster.clusters %}
 mcm_cluster_name: "{{ cluster.cluster_name }}"
 mcm_nodes:
 {% for node in cluster.nodes %}
@@ -64,8 +69,8 @@ mcm_nodes:
 {% endif %}
 
 # OpenSpace Management System (OSMS)
-{% if clusters.openspace_management_system is defined %}
-{% for cluster in clusters.openspace_management_system.clusters %}
+{% if openspace_management_system is defined %}
+{% for cluster in openspace_management_system.clusters %}
 osms_cluster_name: "{{ cluster.cluster_name }}"
 {% if cluster.deployment_yaml is defined %}
 osms_deployment_yaml: "{{ cluster.deployment_yaml }}"
@@ -80,8 +85,8 @@ osms_nodes:
 {% endif %}
 
 # OpenSpace Data Cluster (OSDC)
-{% if clusters.openspace_datapath_cluster is defined %}
-{% for cluster in clusters.openspace_datapath_cluster.clusters %}
+{% if openspace_datapath_cluster is defined %}
+{% for cluster in openspace_datapath_cluster.clusters %}
 osdc_cluster_name: "{{ cluster.cluster_name }}"
 {% if cluster.deployment_yaml is defined %}
 osdc_deployment_yaml: "{{ cluster.deployment_yaml }}"
@@ -127,6 +132,20 @@ sample_vsphere_dir: "{{ config_dir }}/sample-vsphere"
 cache_dir: "{{ install_dir }}/.cache"
 common_dir: "{{ config_dir }}/common"
 
+image_dir: "/docker-workspace/images"
 data_dir: "/docker-workspace/data"
 deployment_dir: "{{ data_dir }}/deployments/{{ deployment.type }}/{{ deployment.version }}"
-onboarder_dir: "{{ data_dir }}/onboarders/{{ onboarder_version }}"
+onboarder_dir: "{{ data_dir }}/onboarders/{{ deployment.onboarder_version }}"
+
+# ==============================================================================
+# VIRTUAL IP ADDRESSES
+# ==============================================================================
+# These VIPs are used for cluster access and load balancing
+vips:
+  osdc: "{{ networks.management }}.249"                  # OSDC ingress VIP
+  osms: "{{ networks.management }}.250"                  # OSMS ingress VIP
+  api_osdc: "{{ networks.management }}.251"              # OSDC Kubernetes API VIP
+  api_osms: "{{ networks.management }}.252"              # OSMS Kubernetes API VIP
+  api_mcm: "{{ networks.management }}.253"               # MCM Rancher API VIP
+  mcm_wildcard: "{{ networks.management }}.254"          # MCM wildcard DNS VIP
+

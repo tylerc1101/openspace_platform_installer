@@ -134,7 +134,7 @@ class TaskExecutor:
         env_vars['ANSIBLE_CONFIG'] = str(self.data_dir / 'ansible.cfg')
         
         # Build ansible-playbook command
-        inventory_path = self.install_dir / "config.yml"
+        inventory_path = self.install_dir / "inventory.yml"
         playbook_path = Path(file)
         
         cmd = [

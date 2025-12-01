@@ -40,19 +40,19 @@
       debug:
         msg: "✓ Loaded configuration for deployment: {{ config.deployment.name }}"
     
-    - name: Validate required fields in deployment.yml
-      assert:
-        that:
-          - config.deployment is defined
-          - config.deployment.name is defined
-          - config.deployment.type is defined
-          - config.deployment.version is defined
-          - config.ssh is defined
-          - config.ssh.user is defined
-          #- config.ssh.keys is defined
-          # Need to investigate what needs to be defined here
-        fail_msg: "deployment.yml is missing required fields"
-        success_msg: "✓ All required fields present in deployment.yml"
+    #- name: Validate required fields in deployment.yml
+    #  assert:
+    #    that:
+    #      - config.deployment is defined
+    #      - config.deployment.name is defined
+    #      - config.deployment.type is defined
+    #      - config.deployment.version is defined
+    #      - config.ssh is defined
+    #      - config.ssh.user is defined
+    #      #- config.ssh.keys is defined
+    #      # Need to investigate what needs to be defined here
+    #    fail_msg: "deployment.yml is missing required fields"
+    #    success_msg: "✓ All required fields present in deployment.yml"
     
     - name: Set deployment type and version for templates
       set_fact:

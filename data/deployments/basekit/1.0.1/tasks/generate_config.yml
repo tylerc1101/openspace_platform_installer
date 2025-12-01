@@ -56,8 +56,8 @@
     
     - name: Set deployment type and version for templates
       set_fact:
-        deployment_type: "{{ config.deployment.type }}"
-        deployment_version: "{{ config.deployment.version }}"
+        deployment_type: "{{ config.deployment.deployment_type }}"
+        deployment_version: "{{ config.deployment.deployment_version }}"
     
     # ==========================================================================
     # PHASE 2: Create Directory Structure

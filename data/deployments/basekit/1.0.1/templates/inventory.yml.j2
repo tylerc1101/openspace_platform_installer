@@ -49,7 +49,7 @@ all:
             # ==================================================================
             infrastructure_cluster:
               children:
-{% for cluster in clusters.management_cluster.clusters %}
+{% for cluster in management_cluster.clusters %}
                 {{ cluster.cluster_name | replace('-', '_') }}:
                   hosts:
 {% for node in cluster.nodes %}
@@ -68,8 +68,8 @@ all:
                 # ==============================================================
                 openspace_management_cluster:
                   children:
-{% if clusters.openspace_management_system is defined %}
-{% for cluster in clusters.openspace_management_system.clusters %}
+{% if openspace_management_system is defined %}
+{% for cluster in openspace_management_system.clusters %}
                     {{ cluster.cluster_name | replace('-', '_') }}:
                       hosts:
 {% for node in cluster.nodes %}
@@ -84,8 +84,8 @@ all:
                 # ==============================================================
                 openspace_data_cluster:
                   children:
-{% if clusters.openspace_datapath_cluster is defined %}
-{% for cluster in clusters.openspace_datapath_cluster.clusters %}
+{% if openspace_datapath_cluster is defined %}
+{% for cluster in openspace_datapath_cluster.clusters %}
                     {{ cluster.cluster_name | replace('-', '_') }}:
                       hosts:
 {% for node in cluster.nodes %}

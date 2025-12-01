@@ -102,24 +102,24 @@ def find_deployment_file() -> Optional[Path]:
     Returns the deployment file path or None if not found.
     """
     deployment_files = list(SCRIPT_DIR.glob("*.deployment.yml"))
-    
+
     if not deployment_files:
         return None
-    
+
     if len(deployment_files) == 1:
         return deployment_files[0]
-    
+
     # Multiple files - prompt user
     print()
     print(f"{Colors.BOLD}Multiple deployment files found:{Colors.ENDC}")
     print()
-    
+
     for i, f in enumerate(deployment_files, 1):
         env_name = f.stem.replace('.deployment', '')
         print(f"  {i}. {f.name} (env: {env_name})")
-    
+
     print()
-    
+
     while True:
         try:
             choice = input(f"Select deployment file [1-{len(deployment_files)}]: ").strip()
@@ -149,13 +149,13 @@ def get_deployment_metadata(deployment_file: Path) -> dict:
     Returns dict with deployment_type, deployment_version, onboarder_version.
     """
     import yaml
-    
+
     try:
         with open(deployment_file, 'r') as f:
             data = yaml.safe_load(f)
-        
+
         deployment = data.get('deployment', {})
-        
+
         return {
             'deployment_type': deployment.get('type', 'basekit'),
             'deployment_version': deployment.get('version', '1.0.1'),
@@ -176,7 +176,7 @@ def load_container_image(runtime: str, image_path: Path) -> str:
     Returns the image reference.
     """
     print_info(f"Checking for onboarder image...")
-    
+
     # Check if image is already loaded
     try:
         result = subprocess.run(
@@ -185,14 +185,14 @@ def load_container_image(runtime: str, image_path: Path) -> str:
             text=True,
             check=True
         )
-        
+
         for line in result.stdout.splitlines():
             if "onboarder" in line.lower():
                 print_success(f"Image already loaded: {line}")
                 return line.strip()
     except subprocess.CalledProcessError:
         pass
-    
+
     # Load the image
     print_info(f"Loading image: {image_path}")
     try:
@@ -202,7 +202,7 @@ def load_container_image(runtime: str, image_path: Path) -> str:
         )
     except subprocess.CalledProcessError as e:
         die(f"Failed to load image: {e}")
-    
+
     # Get the loaded image reference
     try:
         result = subprocess.run(
@@ -211,14 +211,14 @@ def load_container_image(runtime: str, image_path: Path) -> str:
             text=True,
             check=True
         )
-        
+
         for line in result.stdout.splitlines():
             if "onboarder" in line.lower():
                 print_success(f"Image loaded: {line}")
                 return line.strip()
     except subprocess.CalledProcessError:
         pass
-    
+
     die(f"Failed to find image after loading from {image_path}")
 
 
@@ -229,13 +229,13 @@ def get_container_status(runtime: str, container_name: str) -> str:
     """
     try:
         result = subprocess.run(
-            [runtime, "ps", "-a", "--filter", f"name=^{container_name}$", 
+            [runtime, "ps", "-a", "--filter", f"name=^{container_name}$",
              "--format", "{{.Names}}\t{{.State}}"],
             capture_output=True,
             text=True,
             check=True
         )
-        
+
         for line in result.stdout.strip().splitlines():
             if line:
                 parts = line.split('\t')
@@ -245,7 +245,7 @@ def get_container_status(runtime: str, container_name: str) -> str:
                         return 'running'
                     else:
                         return 'exited'
-        
+
         return 'none'
     except subprocess.CalledProcessError:
         return 'none'
@@ -265,7 +265,7 @@ def create_first_run_script(
       3. Runs generate_config.yml to create all config files
       4. Runs prep_onboarder_container.yml
       5. Creates .initialized marker
-    
+
     Returns the script content as a string.
     """
     script = f'''#!/bin/bash
@@ -289,7 +289,7 @@ NC='\\033[0m'
 
 echo ""
 echo -e "${{CYAN}}╔════════════════════════════════════════════════════════════════╗${{NC}}"
-echo -e "${{CYAN}}║     Running Onboarder Preparation Steps                        ║${{NC}}"
+echo -e "${{CYAN}}║     OpenSpace Onboarder - First Run Configuration             ║${{NC}}"
 echo -e "${{CYAN}}╚════════════════════════════════════════════════════════════════╝${{NC}}"
 echo ""
 
@@ -324,20 +324,27 @@ GENERATOR_PLAYBOOK="{CONTAINER_WORKSPACE}/data/deployments/$DEPLOYMENT_TYPE/$DEP
 
 if [ -f "$GENERATOR_PLAYBOOK" ]; then
     cd "$INSTALL_DIR"
-    
+
     # Run the generator playbook
     ansible-playbook "$GENERATOR_PLAYBOOK" \\
         -e "env_name=$ENV_NAME" \\
         -e "config_dir=$INSTALL_DIR" \\
         -e "deployment_file=$INSTALL_DIR/deployment.yml" \\
-        -i "$INSTALL_DIR/inventory.yml",
-    
+        -c local \\
+        -i localhost,
+
     echo -e "${{GREEN}}  ✓ Configuration files generated${{NC}}"
 else
     echo -e "${{RED}}  ✗ Generator playbook not found: $GENERATOR_PLAYBOOK${{NC}}"
     echo -e "${{RED}}    Cannot continue without generate_config.yml${{NC}}"
     exit 1
 fi
+
+echo ""
+echo -e "${{CYAN}}╔════════════════════════════════════════════════════════════════╗${{NC}}"
+echo -e "${{CYAN}}║     Run Onboarder Preparation Playbook                         ║${{NC}}"
+echo -e "${{CYAN}}╚════════════════════════════════════════════════════════════════╝${{NC}}"
+echo ""
 
 # Step 4: Run prep_onboarder_container.yml
 echo -e "${{BLUE}}[4/5] Preparing onboarder container...${{NC}}"
@@ -346,14 +353,14 @@ PREP_PLAYBOOK="{CONTAINER_WORKSPACE}/data/onboarders/$ONBOARDER_VERSION/tasks/pr
 
 if [ -f "$PREP_PLAYBOOK" ]; then
     cd "$INSTALL_DIR"
-    
+
     # Run the prep playbook
     ansible-playbook "$PREP_PLAYBOOK" \\
         -e "env_name=$ENV_NAME" \\
         -e "config_dir=$INSTALL_DIR" \\
         -c local \\
         -i localhost,
-    
+
     echo -e "${{GREEN}}  ✓ Onboarder container prepared${{NC}}"
 else
     echo -e "${{YELLOW}}  ⚠ Prep playbook not found: $PREP_PLAYBOOK${{NC}}"
@@ -407,15 +414,15 @@ def run_interactive_shell(
     """
     container_name = "onboarder"
     env_name = extract_env_name(deployment_file)
-    
+
     # Check container status
     status = get_container_status(runtime, container_name)
-    
+
     if status == 'running':
         # Container is running, exec into it at the install directory
         print_success(f"Container '{container_name}' is already running. Attaching...")
         print()
-        
+
         try:
             result = subprocess.run([
                 runtime, "exec", "-it",
@@ -432,16 +439,16 @@ def run_interactive_shell(
         except Exception as e:
             print_error(f"Failed to exec into container: {e}")
             return 1
-    
+
     elif status == 'exited':
         # Container exists but is stopped, start and exec into it
         print_info(f"Container '{container_name}' exists but is stopped. Starting...")
-        
+
         try:
             subprocess.run([runtime, "start", container_name], check=True)
             print_success(f"Container started. Attaching...")
             print()
-            
+
             result = subprocess.run([
                 runtime, "exec", "-it",
                 "-w", CONTAINER_INSTALL_DIR,
@@ -459,7 +466,7 @@ def run_interactive_shell(
         except Exception as e:
             print_error(f"Failed to exec into container: {e}")
             return 1
-    
+
     else:
         # Container doesn't exist, create new one
         print_info(f"Creating new container '{container_name}'...")
@@ -468,7 +475,7 @@ def run_interactive_shell(
         print_step(f"Deployment type: {metadata['deployment_type']}")
         print_step(f"Deployment version: {metadata['deployment_version']}")
         print_step(f"Onboarder version: {metadata['onboarder_version']}")
-        
+
         # Print startup message
         print()
         print("=" * 70)
@@ -489,21 +496,21 @@ def run_interactive_shell(
         print(f"  {runtime} rm {container_name}        # Remove container when done")
         print("=" * 70)
         print()
-        
+
         # Build volume mounts
         volume_mounts = [
             "-v", f"{DATA_DIR}:/docker-workspace/data:{selinux_opt}",
             "-v", f"{IMAGES_DIR}:/docker-workspace/images:{selinux_opt}",
             "-v", f"{ENVIRONMENTS_DIR}:/docker-workspace/environments:{selinux_opt}",
         ]
-        
+
         # Mount deployment file to /tmp/deployment.yml
         # Use same selinux option as other mounts (Z for podman)
         deployment_mount_opt = "ro,Z" if "Z" in selinux_opt else "ro"
         volume_mounts.extend([
             "-v", f"{deployment_file}:/tmp/deployment.yml:{deployment_mount_opt}"
         ])
-        
+
         # Create the first-run script
         first_run_script = create_first_run_script(
             env_name=env_name,
@@ -511,18 +518,18 @@ def run_interactive_shell(
             deployment_version=metadata['deployment_version'],
             onboarder_version=metadata['onboarder_version']
         )
-        
+
         # Write the script to a temp file on host and mount it
         first_run_script_path = SCRIPT_DIR / ".onboarder-first-run.sh"
         with open(first_run_script_path, 'w') as f:
             f.write(first_run_script)
         first_run_script_path.chmod(0o755)
-        
+
         first_run_mount_opt = "ro,Z" if "Z" in selinux_opt else "ro"
         volume_mounts.extend([
             "-v", f"{first_run_script_path}:/tmp/first-run.sh:{first_run_mount_opt}"
         ])
-        
+
         # Build container command
         # Start in /docker-workspace (exists), run first-run script (creates install dir), then cd into it
         container_cmd = [
@@ -535,15 +542,15 @@ def run_interactive_shell(
             image_ref,
             "/bin/bash", "-c", f"/tmp/first-run.sh && cd {CONTAINER_INSTALL_DIR} && exec /bin/bash"
         ]
-        
+
         # Run container
         try:
             result = subprocess.run(container_cmd)
-            
+
             # Clean up first-run script
             if first_run_script_path.exists():
                 first_run_script_path.unlink()
-            
+
             return result.returncode
         except KeyboardInterrupt:
             print()
@@ -568,13 +575,13 @@ Requires a deployment configuration file: <env_name>.deployment.yml
 USAGE:
   1. Create your deployment config:
      <env_name>.deployment.yml  (e.g., skcp_bottom.deployment.yml)
-  
+
   2. Run this script:
      ./onboarder-run.py
-  
+
   3. On first start, all configs are auto-generated and you land in:
      /docker-workspace/config/install/
-  
+
   4. Run your deployment:
      task --list               # See available tasks
      task prep                 # Prepare environment
@@ -587,34 +594,34 @@ Container Management:
 Examples:
   # Start with deployment file
   ./onboarder-run.py
-  
+
   # Specify a different deployment file
   ./onboarder-run.py --deployment /path/to/my.deployment.yml
         """
     )
-    
+
     parser.add_argument(
         '--deployment', '-d',
         type=Path,
         help='Explicitly specify deployment file (default: auto-detect *.deployment.yml)'
     )
-    
+
     args = parser.parse_args()
-    
+
     # Verify directories exist
     if not DATA_DIR.exists():
         die(f"Data directory not found: {DATA_DIR}")
-    
+
     if not ENVIRONMENTS_DIR.exists():
         die(f"Environments directory not found: {ENVIRONMENTS_DIR}")
-    
+
     if not IMAGES_DIR.exists():
         die(f"Images directory not found: {IMAGES_DIR}")
-    
+
     # Detect container runtime
     runtime, selinux_opt = detect_container_runtime()
     print_info(f"Using runtime: {runtime}")
-    
+
     # Find deployment file
     if args.deployment:
         # Explicit deployment file specified
@@ -624,7 +631,7 @@ Examples:
     else:
         # Auto-detect deployment file
         deployment_file = find_deployment_file()
-        
+
         if not deployment_file:
             print()
             print_error("No deployment file found!")
@@ -639,19 +646,19 @@ Examples:
             print(f"See the deployment.yml.example template for reference.")
             print()
             sys.exit(1)
-    
+
     print_success(f"Using deployment file: {deployment_file.name}")
-    
+
     # Read deployment metadata
     metadata = get_deployment_metadata(deployment_file)
-    
+
     # Check if container already exists
     status = get_container_status(runtime, "onboarder")
-    
+
     if status != 'none':
         # Container exists, we'll attach/start it
         print_info(f"Container 'onboarder' found (status: {status})")
-        
+
         # Get image reference from existing container
         try:
             result = subprocess.run(
@@ -661,7 +668,7 @@ Examples:
                 check=True
             )
             image_id = result.stdout.strip()
-            
+
             # Get image name from ID
             result = subprocess.run(
                 [runtime, "images", "--format", "{{.Repository}}:{{.Tag}}\t{{.ID}}"],
@@ -669,13 +676,13 @@ Examples:
                 text=True,
                 check=True
             )
-            
+
             image_ref = None
             for line in result.stdout.splitlines():
                 if image_id[:12] in line:
                     image_ref = line.split('\t')[0]
                     break
-            
+
             if not image_ref:
                 image_ref = image_id
         except subprocess.CalledProcessError:
@@ -683,14 +690,14 @@ Examples:
     else:
         # Need to load image for new container
         image_path = IMAGES_DIR / "onboarder" / ONBOARDER_IMAGE
-        
+
         if not image_path.exists():
             die(f"Onboarder image not found: {image_path}\n"
                 f"Please update ONBOARDER_IMAGE variable in this script.")
-        
+
         # Load container image
         image_ref = load_container_image(runtime, image_path)
-    
+
     # Run interactive shell
     exit_code = run_interactive_shell(
         runtime=runtime,
@@ -699,7 +706,7 @@ Examples:
         deployment_file=deployment_file,
         metadata=metadata
     )
-    
+
     return exit_code
 
 

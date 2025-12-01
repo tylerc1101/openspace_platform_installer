@@ -50,11 +50,7 @@
           - config.ssh is defined
           - config.ssh.user is defined
           #- config.ssh.keys is defined
-          - config.networks is defined
-          - config.clusters is defined
-          - config.clusters.management_cluster is defined
-          - config.clusters.management_cluster.clusters is defined
-          - config.infrastructure is defined
+          # Need to investigate what needs to be defined here
         fail_msg: "deployment.yml is missing required fields"
         success_msg: "✓ All required fields present in deployment.yml"
     

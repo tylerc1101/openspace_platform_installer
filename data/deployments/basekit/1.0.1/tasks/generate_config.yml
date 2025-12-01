@@ -49,7 +49,7 @@
           - config.deployment.version is defined
           - config.ssh is defined
           - config.ssh.user is defined
-          - config.ssh.keys is defined
+          #- config.ssh.keys is defined
           - config.networks is defined
           - config.clusters is defined
           - config.clusters.management_cluster is defined

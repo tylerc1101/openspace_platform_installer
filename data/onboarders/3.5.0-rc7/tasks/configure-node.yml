@@ -19,7 +19,7 @@
         line: "nameserver {{ item }}"
         create: yes
         state: present
-      loop: "{{ customer_network.dns_servers }}"
+      loop: "{{ customer_dns_servers }}"
 
     - name: Create repo file
       copy:

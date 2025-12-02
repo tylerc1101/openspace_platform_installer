@@ -545,18 +545,12 @@ def run_interactive_shell(
         # Run container
         try:
             result = subprocess.run(container_cmd)
-
-            # Clean up first-run script
-            if first_run_script_path.exists():
-                first_run_script_path.unlink()
-
+            # NOTE: Do NOT delete first-run script - it needs to persist for container restarts
+            # The script checks for .initialized marker and skips setup if already done
             return result.returncode
         except KeyboardInterrupt:
             print()
             print_warning("Interrupted by user")
-            # Clean up first-run script
-            if first_run_script_path.exists():
-                first_run_script_path.unlink()
             return 130
         except Exception as e:
             print_error(f"Failed to run container: {e}")

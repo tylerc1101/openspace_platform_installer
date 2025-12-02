@@ -25,7 +25,7 @@ includes:
       DEPLOYMENT_DIR: '{{ data_dir }}/deployments/{{ deployment.type }}/{{ deployment.version }}'
       INSTALL_DIR: '{{ install_dir }}'
   
-  onboarder-tasks:
+  onboarder:
     taskfile: '{{ data_dir }}/onboarders/{{ deployment.onboarder_version }}/main.yml'
 
 tasks:
@@ -40,17 +40,23 @@ tasks:
   deploy-mcm:
     desc: "Deploy MCM (Management Cluster Manager)"
     cmds:
-      - task: deployment:deploy-mcm
+      - task: onboarder:deploy-mcm
+    vars:
+      HOSTS: management_cluster
 
   deploy-osms:
     desc: "Deploy OSMS (OpenSpace Management System)"
     cmds:
-      - task: deployment:deploy-osms
+      - task: onboarder:deploy-osms
+    vars:
+      HOSTS: openspace_management_system
 
   deploy-osdc:
     desc: "Deploy OSDC (OpenSpace Data Cluster)"
     cmds:
-      - task: deployment:deploy-osdc
+      - task: onboarder:deploy-osdc
+    vars:
+      HOSTS: openspace_datapath_cluster
 
   deploy-all:
     desc: "Deploy all clusters (MCM → OSMS → OSDC)"

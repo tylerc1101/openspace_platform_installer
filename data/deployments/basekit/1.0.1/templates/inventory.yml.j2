@@ -47,7 +47,7 @@ all:
             # ==================================================================
             # Infrastructure/Management Cluster (MCM)
             # ==================================================================
-            infrastructure_cluster:
+            management_cluster:
               children:
 {% for cluster in management_cluster.clusters %}
                 {{ cluster.cluster_name | replace('-', '_') }}:
@@ -66,7 +66,7 @@ all:
                 # ==============================================================
                 # OpenSpace Management Cluster (OSMS)
                 # ==============================================================
-                openspace_management_cluster:
+                openspace_management_system:
                   children:
 {% if openspace_management_system is defined %}
 {% for cluster in openspace_management_system.clusters %}
@@ -82,7 +82,7 @@ all:
                 # ==============================================================
                 # OpenSpace Data Cluster (OSDC)
                 # ==============================================================
-                openspace_data_cluster:
+                openspace_datapath_cluster:
                   children:
 {% if openspace_datapath_cluster is defined %}
 {% for cluster in openspace_datapath_cluster.clusters %}

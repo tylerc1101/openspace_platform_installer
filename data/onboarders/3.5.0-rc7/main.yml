@@ -135,7 +135,16 @@ tasks:
 #=================================================================================#
 # Cluster Deployment                                                              #
 #=================================================================================#
-  
+  deploy-mcm:
+    desc: Deploy MCM Cluster
+    requires:
+      vars: [HOSTS]
+    cmds:
+      - task: run-node-prep
+        vars:
+          HOSTS: '{{.HOSTS}}'
+      - task: run-onboarder
+
   prep-cluster-nodes:
     desc: Prepare Cluster Nodes for Deployment
     cmds:

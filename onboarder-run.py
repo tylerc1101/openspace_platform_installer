@@ -39,6 +39,9 @@ ONBOARDER_IMAGE = "onboarder-full.v3.5.0-rc7.tar.gz"
 # First-run marker file (inside container)
 FIRST_RUN_MARKER = f"{CONTAINER_INSTALL_DIR}/.initialized"
 
+# Scripts directory
+SCRIPTS_DIR = SCRIPT_DIR / "scripts"
+
 
 class Colors:
     """ANSI color codes for terminal output."""
@@ -251,153 +254,6 @@ def get_container_status(runtime: str, container_name: str) -> str:
         return 'none'
 
 
-def create_first_run_script(
-    env_name: str,
-    deployment_type: str,
-    deployment_version: str,
-    onboarder_version: str
-) -> str:
-    """
-    Create the shell script that runs on first container startup.
-    This script:
-      1. Creates /docker-workspace/config/install directory
-      2. Copies deployment.yml there
-      3. Runs generate_config.yml to create all config files
-      4. Runs prep_onboarder_container.yml
-      5. Creates .initialized marker
-
-    Returns the script content as a string.
-    """
-    script = f'''#!/bin/bash
-set -e
-
-INSTALL_DIR="{CONTAINER_INSTALL_DIR}"
-MARKER_FILE="{FIRST_RUN_MARKER}"
-DEPLOYMENT_FILE="/tmp/deployment.yml"
-DEPLOYMENT_TYPE="{deployment_type}"
-DEPLOYMENT_VERSION="{deployment_version}"
-ONBOARDER_VERSION="{onboarder_version}"
-ENV_NAME="{env_name}"
-
-# Colors
-RED='\\033[0;31m'
-GREEN='\\033[0;32m'
-YELLOW='\\033[1;33m'
-BLUE='\\033[0;34m'
-CYAN='\\033[0;36m'
-NC='\\033[0m'
-
-echo ""
-echo -e "${{CYAN}}╔════════════════════════════════════════════════════════════════╗${{NC}}"
-echo -e "${{CYAN}}║     OpenSpace Onboarder - First Run Configuration             ║${{NC}}"
-echo -e "${{CYAN}}╚════════════════════════════════════════════════════════════════╝${{NC}}"
-echo ""
-
-# Check if already initialized
-if [ -f "$MARKER_FILE" ]; then
-    echo -e "${{GREEN}}✓ Environment already initialized${{NC}}"
-    echo ""
-    cd "$INSTALL_DIR"
-    exit 0
-fi
-
-echo -e "${{BLUE}}→ Setting up environment: $ENV_NAME${{NC}}"
-echo -e "  Deployment Type:    $DEPLOYMENT_TYPE"
-echo -e "  Deployment Version: $DEPLOYMENT_VERSION"
-echo -e "  Onboarder Version:  $ONBOARDER_VERSION"
-echo ""
-
-# Step 1: Create install directory
-echo -e "${{BLUE}}[1/5] Creating install directory...${{NC}}"
-mkdir -p "$INSTALL_DIR"
-echo -e "${{GREEN}}  ✓ Created $INSTALL_DIR${{NC}}"
-
-# Step 2: Copy deployment.yml
-echo -e "${{BLUE}}[2/5] Copying deployment configuration...${{NC}}"
-cp "$DEPLOYMENT_FILE" "$INSTALL_DIR/deployment.yml"
-echo -e "${{GREEN}}  ✓ Copied deployment.yml${{NC}}"
-
-# Step 3: Run config generation
-echo -e "${{BLUE}}[3/5] Generating configuration files...${{NC}}"
-
-GENERATOR_PLAYBOOK="{CONTAINER_WORKSPACE}/data/deployments/$DEPLOYMENT_TYPE/$DEPLOYMENT_VERSION/tasks/generate_config.yml"
-
-if [ -f "$GENERATOR_PLAYBOOK" ]; then
-    cd "$INSTALL_DIR"
-
-    # Run the generator playbook
-    ansible-playbook "$GENERATOR_PLAYBOOK" \\
-        -e "env_name=$ENV_NAME" \\
-        -e "config_dir=$INSTALL_DIR" \\
-        -e "deployment_file=$INSTALL_DIR/deployment.yml" \\
-        -c local \\
-        -i localhost,
-
-    echo -e "${{GREEN}}  ✓ Configuration files generated${{NC}}"
-else
-    echo -e "${{RED}}  ✗ Generator playbook not found: $GENERATOR_PLAYBOOK${{NC}}"
-    echo -e "${{RED}}    Cannot continue without generate_config.yml${{NC}}"
-    exit 1
-fi
-
-echo ""
-echo -e "${{CYAN}}╔════════════════════════════════════════════════════════════════╗${{NC}}"
-echo -e "${{CYAN}}║     Run Onboarder Preparation Playbook                         ║${{NC}}"
-echo -e "${{CYAN}}╚════════════════════════════════════════════════════════════════╝${{NC}}"
-echo ""
-
-# Step 4: Run prep_onboarder_container.yml
-echo -e "${{BLUE}}[4/5] Preparing onboarder container...${{NC}}"
-
-PREP_PLAYBOOK="{CONTAINER_WORKSPACE}/data/onboarders/$ONBOARDER_VERSION/tasks/prep_onboarder_container.yml"
-
-if [ -f "$PREP_PLAYBOOK" ]; then
-    cd "$INSTALL_DIR"
-
-    # Run the prep playbook
-    ansible-playbook "$PREP_PLAYBOOK" \\
-        -i "$INSTALL_DIR/inventory.yml" \\
-        -e "env_name=$ENV_NAME" \\
-        -e "target_hosts=localhost"
-
-    echo -e "${{GREEN}}  ✓ Onboarder container prepared${{NC}}"
-else
-    echo -e "${{YELLOW}}  ⚠ Prep playbook not found: $PREP_PLAYBOOK${{NC}}"
-    echo -e "${{YELLOW}}    Skipping container preparation${{NC}}"
-fi
-
-# Step 5: Create marker file
-echo -e "${{BLUE}}[5/5] Finalizing setup...${{NC}}"
-cat > "$MARKER_FILE" << EOF
-initialized=$(date -Iseconds)
-env_name=$ENV_NAME
-deployment_type=$DEPLOYMENT_TYPE
-deployment_version=$DEPLOYMENT_VERSION
-onboarder_version=$ONBOARDER_VERSION
-EOF
-echo -e "${{GREEN}}  ✓ Setup complete${{NC}}"
-
-echo ""
-echo -e "${{GREEN}}╔════════════════════════════════════════════════════════════════╗${{NC}}"
-echo -e "${{GREEN}}║     Environment Ready!                                         ║${{NC}}"
-echo -e "${{GREEN}}╚════════════════════════════════════════════════════════════════╝${{NC}}"
-echo ""
-echo -e "  ${{YELLOW}}Generated files:${{NC}}"
-ls -la "$INSTALL_DIR" 2>/dev/null | grep -v "^total" | grep -v "^\\." | head -15 | while read line; do
-    echo "    $line"
-done
-echo ""
-echo -e "  ${{YELLOW}}Next steps:${{NC}}"
-echo "    task --list           # See available tasks"
-echo "    task prep             # Prepare environment"
-echo "    task deploy-mcm       # Deploy MCM"
-echo ""
-
-cd "$INSTALL_DIR"
-'''
-    return script
-
-
 def run_interactive_shell(
     runtime: str,
     selinux_opt: str,
@@ -440,14 +296,21 @@ def run_interactive_shell(
             return 1
 
     elif status == 'exited':
-        # Container exists but is stopped, start and exec into it
-        print_info(f"Container '{container_name}' exists but is stopped. Starting...")
+        # Container exists but is stopped
+        # We'll start it and exec into it
+        print_info(f"Container '{container_name}' exists but is stopped.")
+        print_info(f"Starting container and attaching...")
+        print()
 
         try:
-            subprocess.run([runtime, "start", container_name], check=True)
-            print_success(f"Container started. Attaching...")
-            print()
-
+            # Start the container (this runs the original command, but our script checks the marker)
+            subprocess.run([runtime, "start", container_name], check=True, capture_output=True)
+            
+            # Give it a moment to start
+            import time
+            time.sleep(1)
+            
+            # Now exec into it
             result = subprocess.run([
                 runtime, "exec", "-it",
                 "-w", CONTAINER_INSTALL_DIR,
@@ -455,8 +318,10 @@ def run_interactive_shell(
                 "/bin/bash"
             ])
             return result.returncode
+            
         except subprocess.CalledProcessError as e:
             print_error(f"Failed to start container: {e}")
+            print_info(f"Tip: If this persists, remove the container with: {runtime} rm {container_name}")
             return 1
         except KeyboardInterrupt:
             print()
@@ -510,53 +375,46 @@ def run_interactive_shell(
             "-v", f"{deployment_file}:/tmp/deployment.yml:{deployment_mount_opt}"
         ])
 
-        # Create the first-run script
-        first_run_script = create_first_run_script(
-            env_name=env_name,
-            deployment_type=metadata['deployment_type'],
-            deployment_version=metadata['deployment_version'],
-            onboarder_version=metadata['onboarder_version']
-        )
-
-        # Write the script to a temp file on host and mount it
-        first_run_script_path = SCRIPT_DIR / ".onboarder-first-run.sh"
-        with open(first_run_script_path, 'w') as f:
-            f.write(first_run_script)
-        first_run_script_path.chmod(0o755)
+        # Mount the first-run script from scripts directory
+        first_run_script_path = SCRIPTS_DIR / "first-run.sh"
+        if not first_run_script_path.exists():
+            die(f"First-run script not found: {first_run_script_path}")
 
         first_run_mount_opt = "ro,Z" if "Z" in selinux_opt else "ro"
         volume_mounts.extend([
-            "-v", f"{first_run_script_path}:/tmp/first-run.sh:{first_run_mount_opt}"
+            "-v", f"{first_run_script_path}:/usr/local/bin/first-run.sh:{first_run_mount_opt}"
         ])
 
-        # Build container command
-        # Start in /docker-workspace (exists), run first-run script (creates install dir), then cd into it
+        # Build environment variables for the container
+        env_vars = [
+            "-e", f"ENV_NAME={env_name}",
+            "-e", f"DEPLOYMENT_TYPE={metadata['deployment_type']}",
+            "-e", f"DEPLOYMENT_VERSION={metadata['deployment_version']}",
+            "-e", f"ONBOARDER_VERSION={metadata['onboarder_version']}",
+            "-e", f"CONTAINER_WORKSPACE={CONTAINER_WORKSPACE}",
+            "-e", f"CONTAINER_INSTALL_DIR={CONTAINER_INSTALL_DIR}",
+            "-e", f"FIRST_RUN_MARKER={FIRST_RUN_MARKER}",
+        ]
+
+        # Build container command - run the mounted script with env vars
         container_cmd = [
             runtime, "run",
             "--name", container_name,
             "--network", "host",
             "-it",
-        ] + volume_mounts + [
+        ] + volume_mounts + env_vars + [
             "-w", CONTAINER_WORKSPACE,
             image_ref,
-            "/bin/bash", "-c", f"/tmp/first-run.sh && cd {CONTAINER_INSTALL_DIR} && exec /bin/bash"
+            "/bin/bash", "-c", f"/usr/local/bin/first-run.sh && cd {CONTAINER_INSTALL_DIR} && exec /bin/bash"
         ]
 
         # Run container
         try:
             result = subprocess.run(container_cmd)
-
-            # Clean up first-run script
-            if first_run_script_path.exists():
-                first_run_script_path.unlink()
-
             return result.returncode
         except KeyboardInterrupt:
             print()
             print_warning("Interrupted by user")
-            # Clean up first-run script
-            if first_run_script_path.exists():
-                first_run_script_path.unlink()
             return 130
         except Exception as e:
             print_error(f"Failed to run container: {e}")
@@ -616,6 +474,9 @@ Examples:
 
     if not IMAGES_DIR.exists():
         die(f"Images directory not found: {IMAGES_DIR}")
+
+    if not SCRIPTS_DIR.exists():
+        die(f"Scripts directory not found: {SCRIPTS_DIR}")
 
     # Detect container runtime
     runtime, selinux_opt = detect_container_runtime()

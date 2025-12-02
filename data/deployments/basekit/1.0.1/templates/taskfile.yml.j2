@@ -43,6 +43,7 @@ tasks:
       - task: onboarder:deploy-mcm
         vars:
           HOSTS: management_cluster
+          DATA_DIR: '{{.DATA_DIR}}'
 
   deploy-osms:
     desc: "Deploy OSMS (OpenSpace Management System)"

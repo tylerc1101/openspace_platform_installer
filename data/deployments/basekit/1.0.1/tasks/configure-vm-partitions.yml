@@ -19,14 +19,8 @@
       - { name: lv_root, percent: 100, mount: / }
 
   tasks:
-    - name: Fix partition (press Enter to continue)
-      pause:
-        prompt: |
-          Fix the drive partition NOW.
-          Press Enter when done.
-
     - name: Check if partition exists
-      shell: "parted {{ disk_device }} print 2>/dev/null | grep '^ {{ partition_number }}' || echo 'NOTFOUND'"
+      shell: "parted {{ disk_device }} --script --fix print 2>/dev/null | grep '^ {{ partition_number }}' || echo 'NOTFOUND'"
       register: partition_check
       changed_when: false
 

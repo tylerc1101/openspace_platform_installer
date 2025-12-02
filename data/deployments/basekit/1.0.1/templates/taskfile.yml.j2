@@ -41,22 +41,22 @@ tasks:
     desc: "Deploy MCM (Management Cluster Manager)"
     cmds:
       - task: onboarder:deploy-mcm
-    vars:
-      HOSTS: management_cluster
+        vars:
+          HOSTS: management_cluster
 
   deploy-osms:
     desc: "Deploy OSMS (OpenSpace Management System)"
     cmds:
       - task: onboarder:deploy-osms
-    vars:
-      HOSTS: openspace_management_system
+        vars:
+          HOSTS: openspace_management_system
 
   deploy-osdc:
     desc: "Deploy OSDC (OpenSpace Data Cluster)"
     cmds:
       - task: onboarder:deploy-osdc
-    vars:
-      HOSTS: openspace_datapath_cluster
+        vars:
+          HOSTS: openspace_datapath_cluster
 
   deploy-all:
     desc: "Deploy all clusters (MCM → OSMS → OSDC)"

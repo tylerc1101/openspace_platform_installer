@@ -106,7 +106,7 @@ tasks:
       - python3 {{.DATA_DIR}}/run_task.py 
           --task-id=configure-node-{{.HOSTS}} 
           --hosts={{.HOSTS}} 
-          --file=./tasks/configure-node.yml 
+          --file={{.ONBOARDER_DIR}}/tasks/configure-node.yml 
           --kind=ansible
 
   install-rke2-selinux:
@@ -117,7 +117,7 @@ tasks:
       - python3 {{.DATA_DIR}}/run_task.py 
           --task-id=install-rke2-selinux-{{.HOSTS}} 
           --hosts={{.HOSTS}} 
-          --file=./tasks/install_rke2-selinux.yml 
+          --file={{.ONBOARDER_DIR}}/tasks/install_rke2-selinux.yml 
           --kind=ansible
 
   run-node-prep:
@@ -129,10 +129,12 @@ tasks:
         vars:
           HOSTS: '{{.HOSTS}}'
           DATA_DIR: '{{.DATA_DIR}}'
+          ONBOARDER_DIR: '{{.ONBOARDER_DIR}}'
       - task: install-rke2-selinux
         vars:
           HOSTS: '{{.HOSTS}}'
           DATA_DIR: '{{.DATA_DIR}}'
+          ONBOARDER_DIR: '{{.ONBOARDER_DIR}}'
 
 #=================================================================================#
 # Cluster Deployment                                                              #
@@ -146,6 +148,7 @@ tasks:
         vars:
           HOSTS: '{{.HOSTS}}'
           DATA_DIR: '{{.DATA_DIR}}'
+          ONBOARDER_DIR: '{{.ONBOARDER_DIR}}'
       - task: run-onboarder
 
   prep-cluster-nodes:

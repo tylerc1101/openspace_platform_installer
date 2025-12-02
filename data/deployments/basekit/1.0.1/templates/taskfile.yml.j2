@@ -27,6 +27,9 @@ includes:
   
   onboarder:
     taskfile: '{{ data_dir }}/onboarders/{{ deployment.onboarder_version }}/main.yml'
+    vars:
+      DATA_DIR: '{{ data_dir }}'
+      ONBOARDER_DIR: '{{ data_dir }}/onboarders/{{ deployment.onboarder_version }}'
 
 tasks:
   # ============================================================================
@@ -43,7 +46,6 @@ tasks:
       - task: onboarder:deploy-mcm
         vars:
           HOSTS: management_cluster
-          DATA_DIR: '{{.DATA_DIR}}'
 
   deploy-osms:
     desc: "Deploy OSMS (OpenSpace Management System)"

@@ -149,3 +149,21 @@ vips:
   api_mcm: "{{ networks.management }}.253"               # MCM Rancher API VIP
   mcm_wildcard: "{{ networks.management }}.254"          # MCM wildcard DNS VIP
 
+# ==============================================================================
+# Virtual Machine Configuration
+# ==============================================================================
+{% if virtual_machines is defined %}
+{% if virtual_machines.mcm is defined %}
+vm_mcm_name: "{{ virtual_machines.mcm.name }}"
+vm_mcm_memory: {{ virtual_machines.mcm.memory }}
+vm_mcm_vcpus: {{ virtual_machines.mcm.vcpus }}
+vm_mcm_disk_size: {{ virtual_machines.mcm.disk_size }}
+{% endif %}
+
+{% if virtual_machines.osms is defined %}
+vm_osms_name: "{{ virtual_machines.osms.name }}"
+vm_osms_memory: {{ virtual_machines.osms.memory }}
+vm_osms_vcpus: {{ virtual_machines.osms.vcpus }}
+vm_osms_disk_size: {{ virtual_machines.osms.disk_size }}
+{% endif %}
+{% endif %}

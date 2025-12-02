@@ -379,6 +379,11 @@ def run_interactive_shell(
         first_run_script_path = SCRIPTS_DIR / "first-run.sh"
         if not first_run_script_path.exists():
             die(f"First-run script not found: {first_run_script_path}")
+        
+        # Ensure script is executable
+        if not first_run_script_path.stat().st_mode & 0o111:
+            print_info("Making first-run script executable...")
+            first_run_script_path.chmod(0o755)
 
         first_run_mount_opt = "ro,Z" if "Z" in selinux_opt else "ro"
         volume_mounts.extend([

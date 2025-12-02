@@ -105,26 +105,6 @@ openspace_management_system:
           idrac_ip: "192.168.0.9"
           roles: ["controlplane", "etcd", "worker"]
   
-# OSDC - OpenSpace Data Cluster
-openspace_datapath_cluster:
-  clusters:
-    - cluster_name: "openspace-osdc"
-      ssh_key: "osdc_ssh_key"
-      nodes:
-        - name: "osdc1"
-          mgmt_ip: "192.168.2.16"
-          mgmt_interface: "enp1s0"
-          idrac_ip: "192.168.0.16"
-          mac_address: "30:3E:A7:2E:3A:8B"
-          roles: ["controlplane", "etcd", "worker"]
-          
-        - name: "osdc2"
-          mgmt_ip: "192.168.2.17"
-          mgmt_interface: "enp1s0"
-          idrac_ip: "192.168.0.17"
-          mac_address: "30:3E:A7:2E:3A:8C"
-          roles: ["worker"]
-
 # ==============================================================================
 # STORAGE CONFIGURATION
 # ==============================================================================
@@ -134,3 +114,21 @@ storage:
     enabled: false
     server: "192.168.2.100"
     path: "/exports/openspace"
+
+# ==============================================================================
+# VIRTUAL MACHINE CONFIGURATION (for basekit deployments)
+# ==============================================================================
+virtual_machines:
+  mcm:
+    name: "mcm"
+    memory: 16384  # MB
+    vcpus: 8
+    disk_size: 100  # GB
+    # Network config pulled from management_cluster.clusters[0].nodes[0]
+  
+  osms:
+    name: "osms"
+    memory: 32768  # MB
+    vcpus: 16
+    disk_size: 100  # GB
+    # Network config pulled from openspace_management_system.clusters[0].nodes[0]

@@ -77,7 +77,7 @@
     - name: Copy in secrets file
       ansible.builtin.copy:
         src: "{{ sample_vsphere_dir }}/{{ item }}"
-        dest: "{{ cache_dir }}/{{ item }}"
+        dest: "{{ install_dir }}/{{ item }}"
         owner: root
         group: root
         mode: '0644'

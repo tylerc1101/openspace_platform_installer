@@ -1,0 +1,15 @@
+[Unit]
+Description=Expand VM Partitions After Hardening
+After=multi-user.target
+After=network-online.target
+ConditionPathExists=!/var/lib/partition-expansion.done
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/expand-partitions.sh
+StandardOutput=journal
+StandardError=journal
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

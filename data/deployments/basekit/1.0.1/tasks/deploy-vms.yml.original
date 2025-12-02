@@ -32,7 +32,7 @@
           --memory {{ vm_mcm_memory | default(16384) }}
           --vcpus {{ vm_mcm_vcpus | default(8) }}
           --cpu host-passthrough
-          --disk size=100,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
+          --disk size=600,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
           --import
@@ -103,7 +103,7 @@
           --memory {{ vm_osms_memory | default(32768) }}
           --vcpus {{ vm_osms_vcpus | default(16) }}
           --cpu host-passthrough
-          --disk size=100,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
+          --disk size=600,backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
           --os-variant rhel9.5
           --network bridge=br-mgmt,model=virtio
           --import
@@ -161,6 +161,34 @@
       when: not osms_exists
       register: osms_start
 
+    # ---------- OSDC provisioner ----------
+    - name: Check if OSDC provisioner VM already exists
+      ansible.builtin.set_fact:
+        osdc_exists: "{{ 'osdc-provisioner' in existing_vms.stdout_lines }}"
+
+    - name: Check if Rocky ISO exists
+      ansible.builtin.stat:
+        path: "{{ images_dir }}/Rocky-9.4-x86_64-dvd.iso"
+      register: rocky_iso_stat
+
+    - name: Create VM - OSDC provisioner
+      ansible.builtin.command:
+        cmd: >
+          virt-install
+          --name osdc-provisioner
+          --memory {{ vm_osdc_memory | default(6144) }}
+          --vcpus {{ vm_osdc_vcpus | default(4) }}
+          --cpu host-passthrough
+          --disk size=100
+          --location {{ images_dir }}/Rocky-9.4-x86_64-dvd.iso,initrd=isolinux/initrd.img,kernel=isolinux/vmlinuz
+          --initrd-inject /var/lib/libvirt/config/vm_config/osdc/prov_vm_ks.cfg
+          --extra-args="inst.ks=file:/prov_vm_ks.cfg console=tty0"
+          --os-variant=rocky9
+          --network bridge=br-iDRAC,model=virtio
+          --noautoconsole
+      when: 
+        - not osdc_exists
+      register: osdc_result
 
     - name: Wait for initial boot and all reboots to complete
       ansible.builtin.pause:

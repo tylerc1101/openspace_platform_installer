@@ -22,8 +22,8 @@ includes:
     taskfile: '{{ data_dir }}/deployments/{{ deployment.type }}/{{ deployment.version }}/main.yml'
     vars:
       DATA_DIR: '{{ data_dir }}'
-      DEPLOYMENT_TYPE: '{{ deployment.type }}'
-      DEPLOYMENT_VERSION: '{{ deployment.version }}'
+      DEPLOYMENT_DIR: '{{ data_dir }}/deployments/{{ deployment.type }}/{{ deployment.version }}'
+      INSTALL_DIR: '{{ install_dir }}'
   
   onboarder-tasks:
     taskfile: '{{ data_dir }}/onboarders/{{ deployment.onboarder_version }}/main.yml'

@@ -101,3 +101,7 @@
         owner: root
         group: root
         mode: '0755'
+
+    # h) Install sshpass
+    - name: Install sshpass
+      command: "rpm -i {{ image_dir }}/rpms/sshpass*"

@@ -23,7 +23,7 @@ interfaces:
     type: "bridge"
     address: "{{ mgmt_kvm.wan_ip }}{{ networks.customer.cidr }}"
     gateway: "{{ networks.customer.gateway }}"
-    dns: "{{ networks.customer.dns_servers }}"
+    dns: {{ networks.customer.dns_servers }}
     interfaces:
       - "{{ mgmt_kvm.wan_interface }}"
 
@@ -32,7 +32,7 @@ interfaces:
     con-name: "br-mgmt"
     type: "bridge"
     address: "{{ mgmt_kvm.mgmt_ip }}{{ networks.management.cidr }}"
-    dns: "{{ networks.management.dns_servers }}"
+    dns: {{ networks.management.dns_servers }}
     interfaces:
       - "{{ mgmt_kvm.mgmt_interface }}"
 

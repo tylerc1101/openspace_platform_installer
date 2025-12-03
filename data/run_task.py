@@ -105,12 +105,27 @@ class TaskLogger:
         self.logger.addHandler(fh)
         self.logger.addHandler(ch)
     
-    def print_banner(self, title: str):
-        """Print a fancy banner for task separation"""
+    def print_banner(self, title: str, width: int = 68):
+        """Print a fancy banner for task separation with centered text"""
+        # Calculate padding for centered text
+        content_width = width - 4  # Account for "║  " and "  ║"
+        title_len = len(title)
+        
+        if title_len > content_width:
+            title = title[:content_width]
+            title_len = content_width
+        
+        # Calculate left and right padding for centering
+        total_padding = content_width - title_len
+        left_padding = total_padding // 2
+        right_padding = total_padding - left_padding
+        
+        # Build the banner
+        border = "═" * (width - 2)
         print("")
-        print(f"{self.CYAN}╔════════════════════════════════════════════════════════════════╗{self.NC}")
-        print(f"{self.CYAN}║  {title:<60}║{self.NC}")
-        print(f"{self.CYAN}╚════════════════════════════════════════════════════════════════╝{self.NC}")
+        print(f"{self.CYAN}╔{border}╗{self.NC}")
+        print(f"{self.CYAN}║ {' ' * left_padding}{title}{' ' * right_padding} ║{self.NC}")
+        print(f"{self.CYAN}╚{border}╝{self.NC}")
         print("")
     
     def print_success(self, message: str):
@@ -121,9 +136,13 @@ class TaskLogger:
         """Print error message"""
         print(f"{self.RED}✗ {message}{self.NC}")
     
+    def print_warning(self, message: str):
+        """Print warning message"""
+        print(f"{self.YELLOW}⚠ {message}{self.NC}")
+    
     def print_separator(self):
         """Print a simple separator line"""
-        print(f"{self.CYAN}{'─' * 64}{self.NC}")
+        print(f"{self.CYAN}{'─' * 68}{self.NC}")
     
     def info(self, msg: str):
         self.logger.info(msg)

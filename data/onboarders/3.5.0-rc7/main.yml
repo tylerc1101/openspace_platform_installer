@@ -97,6 +97,16 @@ tasks:
 #=================================================================================#
 # Node Prep                                                                       #
 #=================================================================================#
+  copy-ssh-key:
+    desc: Copy SSH Key to Target Hosts
+    requires:
+      vars: [HOSTS]
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py
+          --task-id=copy-ssh-key-{{.HOSTS}}
+          --hosts={{.HOSTS}}
+          --file={{.DATA_DIR}}/common/copy_ssh_key.yml
+          --kind=ansible
 
   node-prep:
     desc: Cluster Node Prep

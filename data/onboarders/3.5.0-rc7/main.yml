@@ -144,6 +144,11 @@ tasks:
     requires:
       vars: [HOSTS]
     cmds:
+      - task: copy-ssh-key
+        vars:
+          HOSTS: '{{.HOSTS}}'
+          DATA_DIR: '{{.DATA_DIR}}'
+          INSTALL_DIR: '{{.INSTALL_DIR}}'
       - task: run-node-prep
         vars:
           HOSTS: '{{.HOSTS}}'

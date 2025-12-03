@@ -68,6 +68,13 @@ class StateManager:
 class TaskLogger:
     """Handles logging for task execution"""
     
+    # ANSI color codes
+    CYAN = '\033[96m'
+    GREEN = '\033[92m'
+    YELLOW = '\033[93m'
+    RED = '\033[91m'
+    NC = '\033[0m'  # No Color
+    
     def __init__(self, task_id: str):
         self.task_id = task_id
         
@@ -97,6 +104,26 @@ class TaskLogger:
         
         self.logger.addHandler(fh)
         self.logger.addHandler(ch)
+    
+    def print_banner(self, title: str):
+        """Print a fancy banner for task separation"""
+        print("")
+        print(f"{self.CYAN}╔════════════════════════════════════════════════════════════════╗{self.NC}")
+        print(f"{self.CYAN}║  {title:<60}║{self.NC}")
+        print(f"{self.CYAN}╚════════════════════════════════════════════════════════════════╝{self.NC}")
+        print("")
+    
+    def print_success(self, message: str):
+        """Print success message"""
+        print(f"{self.GREEN}✓ {message}{self.NC}")
+    
+    def print_error(self, message: str):
+        """Print error message"""
+        print(f"{self.RED}✗ {message}{self.NC}")
+    
+    def print_separator(self):
+        """Print a simple separator line"""
+        print(f"{self.CYAN}{'─' * 64}{self.NC}")
     
     def info(self, msg: str):
         self.logger.info(msg)
@@ -200,30 +227,38 @@ def main():
     
     args = parser.parse_args()
     
-    # Initialize state manager (no env needed)
+    # Initialize state manager
     state = StateManager()
+    
+    # Initialize logger
+    logger = TaskLogger(args.task_id or "setup")
     
     # Handle resume
     if args.resume:
         last_task = state.get_last_incomplete_task()
         if not last_task:
+            logger.print_banner("Resume Check")
             print("No incomplete tasks to resume")
             return 0
-        print(f"Cannot auto-resume - please run the failed task manually: {last_task}")
+        logger.print_banner("Resume Failed")
+        logger.print_error(f"Cannot auto-resume - please run the failed task manually: {last_task}")
         return 1
     
     # Validate task parameters
     if not args.task_id:
-        print("Error: --task-id is required")
+        logger.print_error("--task-id is required")
         return 1
     
     # Check if already completed
     if state.is_completed(args.task_id):
-        print(f"Task {args.task_id} already completed, skipping...")
+        logger.print_banner(f"Task: {args.task_id}")
+        print(f"Task already completed, skipping...")
         return 0
     
-    # Initialize logger and executor (no env needed)
-    logger = TaskLogger(args.task_id)
+    # Print task banner
+    logger.print_banner(f"Executing Task: {args.task_id}")
+    
+    # Initialize executor
     executor = TaskExecutor(logger)
     
     # Mark task as started
@@ -242,13 +277,17 @@ def main():
         
         # Mark as completed
         state.mark_completed(args.task_id)
-        logger.info(f"Task {args.task_id} completed successfully")
+        logger.print_separator()
+        logger.print_success(f"Task {args.task_id} completed successfully")
+        logger.print_separator()
         return 0
         
     except Exception as e:
         # Mark as failed
         state.mark_failed(args.task_id, str(e))
-        logger.error(f"Task {args.task_id} failed: {str(e)}")
+        logger.print_separator()
+        logger.print_error(f"Task {args.task_id} failed: {str(e)}")
+        logger.print_separator()
         return 1
 
 

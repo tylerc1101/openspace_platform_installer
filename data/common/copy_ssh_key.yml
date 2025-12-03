@@ -7,7 +7,7 @@
   vars:
     env_name: "{{ env_name | mandatory }}"
     target_user: "{{ ansible_user | default('kratos') }}"
-    ssh_pubkey_path: "{{ ssh_pubkey_path | mandatory }}"
+    ssh_pubkey_path: "{{.INSTALL_DIR}}/.cache/rancher_ssh_key"
 
   tasks:
     - name: Validate that ssh_pubkey_path exists (on localhost)

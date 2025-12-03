@@ -21,7 +21,8 @@ all:
         # SSH Configuration
         # ======================================================================
         ansible_user: "{{ ssh.user }}"
-
+        ansible_ssh_pass: "{{ ssh.pass }}"
+        ansible_become_pass: "{{ ssh.become }}"
       hosts:
         # ======================================================================
         # Localhost

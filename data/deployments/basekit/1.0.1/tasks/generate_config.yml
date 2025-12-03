@@ -128,12 +128,17 @@
         mode: '0644'
       vars:
         deployment: "{{ config.deployment }}"
+        ssh: "{{ config.ssh }}"
         networks: "{{ config.networks }}"
         domain: "{{ config.domain }}"
         ntp: "{{ config.ntp }}"
         vips: "{{ config.vips | default({}) }}"
         storage: "{{ config.storage | default({}) }}"
-    
+        virtual_machines: "{{ config.virtual_machines | default({}) }}"
+        management_cluster: "{{ config.management_cluster | default({}) }}"
+        openspace_management_system: "{{ config.openspace_management_system | default({}) }}"
+        openspace_datapath_cluster: "{{ config.openspace_datapath_cluster | default({}) }}"
+
     # ==========================================================================
     # PHASE 5: Generate host_vars Files
     # ==========================================================================

@@ -56,7 +56,7 @@ idrac_gateway: "{{ networks.idrac.gateway }}"
 # ==============================================================================
 
 # Management Cluster (MCM)
-{% if management_cluster is defined %}
+{% if management_cluster is defined and management_cluster.clusters is defined %}
 {% for cluster in management_cluster.clusters %}
 mcm_cluster_name: "{{ cluster.cluster_name }}"
 mcm_nodes:
@@ -69,7 +69,7 @@ mcm_nodes:
 {% endif %}
 
 # OpenSpace Management System (OSMS)
-{% if openspace_management_system is defined %}
+{% if openspace_management_system is defined and openspace_management_system.clusters is defined %}
 {% for cluster in openspace_management_system.clusters %}
 osms_cluster_name: "{{ cluster.cluster_name }}"
 {% if cluster.deployment_yaml is defined %}
@@ -85,7 +85,7 @@ osms_nodes:
 {% endif %}
 
 # OpenSpace Data Cluster (OSDC)
-{% if openspace_datapath_cluster is defined %}
+{% if openspace_datapath_cluster is defined and openspace_datapath_cluster.clusters is defined %}
 {% for cluster in openspace_datapath_cluster.clusters %}
 osdc_cluster_name: "{{ cluster.cluster_name }}"
 {% if cluster.deployment_yaml is defined %}
@@ -142,12 +142,12 @@ onboarder_dir: "{{ data_dir }}/onboarders/{{ deployment.onboarder_version }}"
 # ==============================================================================
 # These VIPs are used for cluster access and load balancing
 vips:
-  osdc: "{{ networks.management }}.249"                  # OSDC ingress VIP
-  osms: "{{ networks.management }}.250"                  # OSMS ingress VIP
-  api_osdc: "{{ networks.management }}.251"              # OSDC Kubernetes API VIP
-  api_osms: "{{ networks.management }}.252"              # OSMS Kubernetes API VIP
-  api_mcm: "{{ networks.management }}.253"               # MCM Rancher API VIP
-  mcm_wildcard: "{{ networks.management }}.254"          # MCM wildcard DNS VIP
+  osdc: "{{ networks.management.network }}.249"                  # OSDC ingress VIP
+  osms: "{{ networks.management.network }}.250"                  # OSMS ingress VIP
+  api_osdc: "{{ networks.management.network }}.251"              # OSDC Kubernetes API VIP
+  api_osms: "{{ networks.management.network }}.252"              # OSMS Kubernetes API VIP
+  api_mcm: "{{ networks.management.network }}.253"               # MCM Rancher API VIP
+  mcm_wildcard: "{{ networks.management.network }}.254"          # MCM wildcard DNS VIP
 
 # ==============================================================================
 # Virtual Machine Configuration

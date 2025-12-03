@@ -5,12 +5,8 @@
   vars:
     images_dir: /var/lib/libvirt/config/images
     
-    # Extract MCM node configuration from inventory
-    mcm_node: "{{ management_cluster.clusters[0].nodes[0] }}"
-    mcm_network_cidr_prefix: "{{ networks.management.cidr | regex_replace('^/', '') }}"
-    
-    # Extract OSMS node configuration from inventory
-    osms_node: "{{ openspace_management_system.clusters[0].nodes[0] }}"
+    # Extract network CIDR prefix (e.g., "23" from "/23")
+    mgmt_cidr_prefix: "{{ mgmt_cidr | regex_replace('^/', '') }}"
 
   tasks:
     # Pre-flight checks
@@ -64,32 +60,32 @@
 
     - name: Create network config for MCM
       ansible.builtin.copy:
-        dest: /tmp/ifcfg-{{ mcm_node.mgmt_interface }}
+        dest: /tmp/ifcfg-enp1s0
         content: |
           TYPE=Ethernet
           BOOTPROTO=static
-          NAME=static-{{ mcm_node.mgmt_interface }}
-          DEVICE={{ mcm_node.mgmt_interface }}
+          NAME=static-enp1s0
+          DEVICE=enp1s0
           ONBOOT=yes
-          IPADDR={{ mcm_node.mgmt_ip }}
-          PREFIX={{ mcm_network_cidr_prefix }}
-          GATEWAY={{ networks.management.gateway }}
-          DNS1={{ networks.management.dns_servers[0] }}
-          {% if networks.management.dns_servers | length > 1 %}
-          DNS2={{ networks.management.dns_servers[1] }}
+          IPADDR={{ mcm_nodes[0].mgmt_ip }}
+          PREFIX={{ mgmt_cidr_prefix }}
+          GATEWAY={{ mgmt_gateway }}
+          DNS1={{ mgmt_dns_servers[0] }}
+          {% if mgmt_dns_servers | length > 1 %}
+          DNS2={{ mgmt_dns_servers[1] }}
           {% endif %}
       when: not mcm_exists
 
     - name: Inject network config into MCM disk
       ansible.builtin.command:
-        cmd: virt-copy-in -a {{ mcm_disk.stdout }} /tmp/ifcfg-{{ mcm_node.mgmt_interface }} /etc/sysconfig/network-scripts/
+        cmd: virt-copy-in -a {{ mcm_disk.stdout }} /tmp/ifcfg-enp1s0 /etc/sysconfig/network-scripts/
       environment:
         LIBGUESTFS_BACKEND: direct
       when: not mcm_exists
 
     - name: Remove temporary network config file for MCM
       ansible.builtin.file:
-        path: /tmp/ifcfg-{{ mcm_node.mgmt_interface }}
+        path: /tmp/ifcfg-enp1s0
         state: absent
 
     - name: Start MCM VM
@@ -138,32 +134,32 @@
 
     - name: Create network config for OSMS
       ansible.builtin.copy:
-        dest: /tmp/ifcfg-{{ osms_node.mgmt_interface }}
+        dest: /tmp/ifcfg-enp1s0
         content: |
           TYPE=Ethernet
           BOOTPROTO=static
-          NAME=static-{{ osms_node.mgmt_interface }}
-          DEVICE={{ osms_node.mgmt_interface }}
+          NAME=static-enp1s0
+          DEVICE=enp1s0
           ONBOOT=yes
-          IPADDR={{ osms_node.mgmt_ip }}
-          PREFIX={{ mcm_network_cidr_prefix }}
-          GATEWAY={{ networks.management.gateway }}
-          DNS1={{ networks.management.dns_servers[0] }}
-          {% if networks.management.dns_servers | length > 1 %}
-          DNS2={{ networks.management.dns_servers[1] }}
+          IPADDR={{ osms_nodes[0].mgmt_ip }}
+          PREFIX={{ mgmt_cidr_prefix }}
+          GATEWAY={{ mgmt_gateway }}
+          DNS1={{ mgmt_dns_servers[0] }}
+          {% if mgmt_dns_servers | length > 1 %}
+          DNS2={{ mgmt_dns_servers[1] }}
           {% endif %}
       when: not osms_exists
 
     - name: Inject network config into OSMS disk
       ansible.builtin.command:
-        cmd: virt-copy-in -a {{ osms_disk.stdout }} /tmp/ifcfg-{{ osms_node.mgmt_interface }} /etc/sysconfig/network-scripts/
+        cmd: virt-copy-in -a {{ osms_disk.stdout }} /tmp/ifcfg-enp1s0 /etc/sysconfig/network-scripts/
       environment:
         LIBGUESTFS_BACKEND: direct
       when: not osms_exists
 
     - name: Remove temporary network config file for OSMS
       ansible.builtin.file:
-        path: /tmp/ifcfg-{{ osms_node.mgmt_interface }}
+        path: /tmp/ifcfg-enp1s0
         state: absent
 
     - name: Start OSMS VM
@@ -174,58 +170,32 @@
       when: not osms_exists
       register: osms_start
 
-    # ---------- Wait for VMs and Run Partition Expansion ----------
-    
+# ---------- Wait for VMs ----------
+
     - name: Wait for MCM SSH to be available (initial boot)
       ansible.builtin.wait_for:
-        host: "{{ mcm_node.mgmt_ip }}"
+        host: "{{ hostvars['mcm1']['ansible_host'] }}"
         port: 22
-        delay: 60
-        timeout: 600
+        delay: 120
+        timeout: 900
       when: mcm_start is changed
+
+    - name: Verify SSH connectivity to MCM
+      ansible.builtin.command: echo "SSH_OK"
+      delegate_to: mcm1
+      register: mcm_ssh_test
+      until: mcm_ssh_test.stdout is search("SSH_OK")
+      retries: 30
+      delay: 30
+      when: mcm_start is changed
+      changed_when: false
 
     - name: Check MCM uptime to detect if hardening reboots are complete
-      ansible.builtin.shell: ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ ssh.user }}@{{ mcm_node.mgmt_ip }} 'cat /proc/uptime | cut -d" " -f1 | cut -d"." -f1'
-      register: mcm_uptime
-      until: mcm_uptime.stdout | int > 300  # Uptime > 5 minutes means probably done rebooting
+      ansible.builtin.command: cat /proc/uptime
+      delegate_to: mcm1
+      register: mcm_uptime_raw
+      until: (mcm_uptime_raw.stdout.split()[0] | float) > 150
       retries: 20
       delay: 60
       when: mcm_start is changed
       changed_when: false
-
-    - name: Run partition expansion on MCM
-      ansible.builtin.shell: ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ ssh.user }}@{{ mcm_node.mgmt_ip }} 'bash -s' < {{ playbook_dir }}/scripts/expand-partitions.sh
-      when: mcm_start is changed
-      register: mcm_partition_result
-
-    - name: Show MCM partition expansion results
-      ansible.builtin.debug:
-        var: mcm_partition_result.stdout_lines
-      when: mcm_start is changed
-
-    - name: Wait for OSMS SSH to be available (initial boot)
-      ansible.builtin.wait_for:
-        host: "{{ osms_node.mgmt_ip }}"
-        port: 22
-        delay: 60
-        timeout: 600
-      when: osms_start is changed
-
-    - name: Check OSMS uptime to detect if hardening reboots are complete
-      ansible.builtin.shell: ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ ssh.user }}@{{ osms_node.mgmt_ip }} 'cat /proc/uptime | cut -d" " -f1 | cut -d"." -f1'
-      register: osms_uptime
-      until: osms_uptime.stdout | int > 300  # Uptime > 5 minutes means probably done rebooting
-      retries: 20
-      delay: 60
-      when: osms_start is changed
-      changed_when: false
-
-    - name: Run partition expansion on OSMS
-      ansible.builtin.shell: ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {{ ssh.user }}@{{ osms_node.mgmt_ip }} 'bash -s' < {{ playbook_dir }}/scripts/expand-partitions.sh
-      when: osms_start is changed
-      register: osms_partition_result
-
-    - name: Show OSMS partition expansion results
-      ansible.builtin.debug:
-        var: osms_partition_result.stdout_lines
-      when: osms_start is changed

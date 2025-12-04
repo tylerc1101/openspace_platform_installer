@@ -31,6 +31,14 @@ includes:
       DATA_DIR: '{{ data_dir }}'
       ONBOARDER_DIR: '{{ data_dir }}/onboarders/{{ deployment.onboarder_version }}'
       INSTALL_DIR: '{{ install_dir }}'
+      COMMON_DIR: '{{ data_dir }}/common'
+
+  common:
+    taskfile: '{{ data_dir }}/common/main.yml'
+    vars:
+      DATA_DIR: '{{ data_dir }}'
+      COMMON_DIR: '{{ data_dir }}/common'
+      INSTALL_DIR: '{{ install_dir }}'
 
 tasks:
   # ============================================================================
@@ -47,6 +55,7 @@ tasks:
       - task: onboarder:deploy-mcm
         vars:
           HOSTS: management_cluster
+      - task: onboarder:get-kubeconfig-mcm
 
   deploy-osms:
     desc: "Deploy OSMS (OpenSpace Management System)"
@@ -54,6 +63,7 @@ tasks:
       - task: onboarder:deploy-osms
         vars:
           HOSTS: openspace_management_system
+      - task: onboarder:get-kubeconfig-osms
 
   deploy-osdc:
     desc: "Deploy OSDC (OpenSpace Data Cluster)"
@@ -61,6 +71,7 @@ tasks:
       - task: onboarder:deploy-osdc
         vars:
           HOSTS: openspace_datapath_cluster
+      - task: onboarder:get-kubeconfig-osdc
 
   deploy-all:
     desc: "Deploy all clusters (MCM → OSMS → OSDC)"
@@ -69,6 +80,24 @@ tasks:
       - task: deploy-mcm
       - task: deploy-osms
       - task: deploy-osdc
+
+  # ============================================================================
+  # Kubeconfig Tasks
+  # ============================================================================
+  get-kubeconfig-mcm:
+    desc: "Retrieve MCM kubeconfig file"
+    cmds:
+      - task: onboarder:get-kubeconfig-mcm
+
+  get-kubeconfig-osms:
+    desc: "Retrieve OSMS kubeconfig file"
+    cmds:
+      - task: get-kubeconfig-osms
+
+  get-kubeconfig-osdc:
+    desc: "Retrieve OSDC kubeconfig file"
+    cmds:
+      - task: onboarder:get-kubeconfig-osdc
 
   # ============================================================================
   # Cleanup Tasks

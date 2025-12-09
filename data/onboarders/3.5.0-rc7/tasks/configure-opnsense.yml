@@ -4,7 +4,7 @@
   
   vars:
     env_name: "{{ env_name | mandatory }}"
-    template_file: "/docker-workspace/data/deployments/basekit/1.0.1/files/config_template.xml"
+    template_file: "{{ onboarder_dir }}/files/config_template.xml"
     output_dir: "/docker-workspace/config/install/generated_files"
     output_file: "{{ output_dir }}/config.xml"
     wan_ip: "{{ hostvars['opnsense'].ansible_host }}"

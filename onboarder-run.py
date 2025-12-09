@@ -31,6 +31,7 @@ IMAGES_DIR = SCRIPT_DIR / "images"
 CONTAINER_WORKSPACE = "/docker-workspace"
 CONTAINER_CONFIG_DIR = f"{CONTAINER_WORKSPACE}/config"
 CONTAINER_INSTALL_DIR = f"{CONTAINER_CONFIG_DIR}/install"
+CONTAINER_DATA_DIR = f"{CONTAINER_WORKSPACE}/data"
 
 # Onboarder image configuration
 ONBOARDER_IMAGE = "onboarder-full.v3.5.0-rc7.tar.gz"
@@ -390,7 +391,7 @@ def run_interactive_shell(
             "-e", f"DEPLOYMENT_TYPE={metadata['deployment_type']}",
             "-e", f"ONBOARDER_VERSION={metadata['onboarder_version']}",
             "-e", f"CONTAINER_WORKSPACE={CONTAINER_WORKSPACE}",
-            "-e", f"CONTAINER_DATA_DIR={DATA_DIR}",
+            "-e", f"CONTAINER_DATA_DIR={CONTAINER_DATA_DIR}",
             "-e", f"CONTAINER_INSTALL_DIR={CONTAINER_INSTALL_DIR}",
             "-e", f"FIRST_RUN_MARKER={FIRST_RUN_MARKER}",
         ]

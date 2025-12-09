@@ -18,7 +18,7 @@
 version: '3'
 
 includes:
-  deployment:
+  main:
     taskfile: '{{ data_dir }}/onboarders/{{ deployment.onboarder_version }}/main.yml'
     vars:
       DATA_DIR: '{{ data_dir }}'
@@ -33,20 +33,20 @@ tasks:
   deploy-infra:
     desc: "Deploys {{ deployment.type }} infrastructure"
     cmds:
-      - task: deployment:deploy-infra
+      - task: main:deploy-infra
 
   deploy-mcm:
     desc: "Deploy MCM (Management Cluster Manager)"
     cmds:
-      - task: deployment:deploy-mcm
+      - task: main:deploy-mcm
         vars:
           HOSTS: management_cluster
-      - task: deployment:get-kubeconfig-mcm
+      - task: main:get-kubeconfig-mcm
 
   deploy-osms:
     desc: "Deploy OSMS (OpenSpace Management System)"
     cmds:
-      - task: deployment:deploy-osms
+      - task: main:deploy-osms
         vars:
           HOSTS: openspace_management_system
       #- task: deployment:get-kubeconfig-osms
@@ -54,7 +54,7 @@ tasks:
   deploy-osdc:
     desc: "Deploy OSDC (OpenSpace Data Cluster)"
     cmds:
-      - task: deployment:deploy-osdc
+      - task: main:deploy-osdc
         vars:
           HOSTS: openspace_datapath_cluster
       #- task: deployment:get-kubeconfig-osdc
@@ -73,17 +73,17 @@ tasks:
   get-kubeconfig-mcm:
     desc: "Retrieve MCM kubeconfig file"
     cmds:
-      - task: deployment:get-kubeconfig-mcm
+      - task: main:get-kubeconfig-mcm
 
   get-kubeconfig-osms:
     desc: "Retrieve OSMS kubeconfig file"
     cmds:
-      - task: deployment:get-kubeconfig-osms
+      - task: main:get-kubeconfig-osms
 
   get-kubeconfig-osdc:
     desc: "Retrieve OSDC kubeconfig file"
     cmds:
-      - task: deployment:get-kubeconfig-osdc
+      - task: main:get-kubeconfig-osdc
 
   # ============================================================================
   # Cleanup Tasks

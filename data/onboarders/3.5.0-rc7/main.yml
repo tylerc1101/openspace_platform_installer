@@ -2,7 +2,7 @@ version: '3'
 
 includes:
   deployment:
-    taskfile: '{{.ONBOARDER_DIR}}/{{.DEPLOYMENT_TYPE}}.yml''
+    taskfile: '{{.DEPLOYMENT_TYPE}}.yml'
     vars:
       DATA_DIR: '{{.DATA_DIR}}'
       ONBOARDER_DIR: '{{.ONBOARDER_DIR}}'
@@ -57,7 +57,7 @@ tasks:
           HOSTS: '{{.HOSTS}}'
           DATA_DIR: '{{.DATA_DIR}}'
 
-    deploy-osdc:
+  deploy-osdc:
     desc: Deploy OSDC Cluster
     requires:
       vars: [HOSTS]

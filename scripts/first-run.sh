@@ -10,9 +10,7 @@
 #   5. Mark environment as initialized
 #
 # Environment variables (passed by onboarder-run.py):
-#   - ENV_NAME: Environment name (e.g., skcp_bottom)
 #   - DEPLOYMENT_TYPE: Deployment type (e.g., basekit, aws)
-#   - DEPLOYMENT_VERSION: Deployment version (e.g., 1.0.1)
 #   - ONBOARDER_VERSION: Onboarder version (e.g., 3.5.0-rc7)
 #   - CONTAINER_WORKSPACE: Container workspace path (e.g., /docker-workspace)
 #   - CONTAINER_INSTALL_DIR: Install directory path
@@ -21,16 +19,17 @@
 set -e
 
 # Validate required environment variables
-: "${ENV_NAME:?Environment variable ENV_NAME is required}"
 : "${DEPLOYMENT_TYPE:?Environment variable DEPLOYMENT_TYPE is required}"
-: "${DEPLOYMENT_VERSION:?Environment variable DEPLOYMENT_VERSION is required}"
 : "${ONBOARDER_VERSION:?Environment variable ONBOARDER_VERSION is required}"
 : "${CONTAINER_WORKSPACE:?Environment variable CONTAINER_WORKSPACE is required}"
+: "${CONTAINER_DATA_DIR:?Environment variable CONTAINER_DATA_DIR is required}"
 : "${CONTAINER_INSTALL_DIR:?Environment variable CONTAINER_INSTALL_DIR is required}"
 : "${FIRST_RUN_MARKER:?Environment variable FIRST_RUN_MARKER is required}"
 
 # Configuration
 INSTALL_DIR="${CONTAINER_INSTALL_DIR}"
+DATA_DIR="${CONTAINER_DATA_DIR}"
+ONBOARDER_DIR="${DATA_DIR}/onboarders/${ONBOARDER_VERSION}"
 MARKER_FILE="${FIRST_RUN_MARKER}"
 DEPLOYMENT_FILE="/tmp/deployment.yml"
 CONFIG_DIR="${CONTAINER_WORKSPACE}/config"
@@ -59,7 +58,6 @@ fi
 
 echo -e "${BLUE}→ Setting up environment: $ENV_NAME${NC}"
 echo -e "  Deployment Type:    $DEPLOYMENT_TYPE"
-echo -e "  Deployment Version: $DEPLOYMENT_VERSION"
 echo -e "  Onboarder Version:  $ONBOARDER_VERSION"
 echo ""
 
@@ -80,16 +78,16 @@ echo -e "${GREEN}  ✓ Copied deployment.yml${NC}"
 # Step 3: Run config generation
 echo -e "${BLUE}[3/5] Generating configuration files...${NC}"
 
-GENERATOR_PLAYBOOK="${CONTAINER_WORKSPACE}/data/deployments/${DEPLOYMENT_TYPE}/${DEPLOYMENT_VERSION}/tasks/generate_config.yml"
+GENERATOR_PLAYBOOK="${ONBOARDER_DIR}/tasks/generate_config.yml"
 
 if [ -f "$GENERATOR_PLAYBOOK" ]; then
     cd "$INSTALL_DIR"
 
     # Run the generator playbook
     ansible-playbook "$GENERATOR_PLAYBOOK" \
-        -e "env_name=$ENV_NAME" \
-        -e "config_dir=$INSTALL_DIR" \
-        -e "deployment_file=$INSTALL_DIR/deployment.yml" \
+        -e "install_dir=$INSTALL_DIR" \
+        -e "deployment_config=$INSTALL_DIR/deployment.yml" \
+        -e "templates_dir=$ONBOARDER_DIR/templates" \
         -c local \
         -i localhost,
 
@@ -109,7 +107,7 @@ echo ""
 # Step 4: Run prep_onboarder_container.yml
 echo -e "${BLUE}[4/5] Preparing onboarder container...${NC}"
 
-PREP_PLAYBOOK="${CONTAINER_WORKSPACE}/data/onboarders/${ONBOARDER_VERSION}/tasks/prep_onboarder_container.yml"
+PREP_PLAYBOOK="${ONBOARDER_DIR}/tasks/prep_onboarder_container.yml"
 
 if [ -f "$PREP_PLAYBOOK" ]; then
     cd "$INSTALL_DIR"
@@ -117,7 +115,6 @@ if [ -f "$PREP_PLAYBOOK" ]; then
     # Run the prep playbook
     ansible-playbook "$PREP_PLAYBOOK" \
         -i "$INSTALL_DIR/inventory.yml" \
-        -e "env_name=$ENV_NAME" \
         -e "target_hosts=localhost"
 
     echo -e "${GREEN}  ✓ Onboarder container prepared${NC}"
@@ -132,7 +129,6 @@ cat > "$MARKER_FILE" << EOF
 initialized=$(date -Iseconds)
 env_name=$ENV_NAME
 deployment_type=$DEPLOYMENT_TYPE
-deployment_version=$DEPLOYMENT_VERSION
 onboarder_version=$ONBOARDER_VERSION
 EOF
 echo -e "${GREEN}  ✓ Setup complete${NC}"

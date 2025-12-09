@@ -9,7 +9,6 @@
 deployment:
   name: "test-onboarder-server"
   type: "basekit"
-  version: "1.0.1"
   onboarder_version: "3.5.0-rc7"
   osms_tooling_version: "1.8.x"
 

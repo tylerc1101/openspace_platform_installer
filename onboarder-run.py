@@ -25,7 +25,6 @@ from typing import List, Optional, Tuple
 # Paths
 SCRIPT_DIR = Path(__file__).parent.resolve()
 DATA_DIR = SCRIPT_DIR / "data"
-ENVIRONMENTS_DIR = SCRIPT_DIR / "environments"
 IMAGES_DIR = SCRIPT_DIR / "images"
 
 # Container workspace paths (inside container)
@@ -149,7 +148,7 @@ def extract_env_name(deployment_file: Path) -> str:
 def get_deployment_metadata(deployment_file: Path) -> dict:
     """
     Read deployment file and extract metadata (type, version, onboarder_version).
-    Returns dict with deployment_type, deployment_version, onboarder_version.
+    Returns dict with deployment_type and onboarder_version.
     """
     import yaml
 
@@ -161,14 +160,12 @@ def get_deployment_metadata(deployment_file: Path) -> dict:
 
         return {
             'deployment_type': deployment.get('type', 'basekit'),
-            'deployment_version': deployment.get('version', '1.0.1'),
             'onboarder_version': deployment.get('onboarder_version', '3.5.0-rc7'),
         }
     except Exception as e:
         print_warning(f"Could not parse deployment file: {e}")
         return {
             'deployment_type': 'basekit',
-            'deployment_version': '1.0.1',
             'onboarder_version': '3.5.0-rc7',
         }
 
@@ -337,7 +334,6 @@ def run_interactive_shell(
         print_step(f"Deployment file: {deployment_file.name}")
         print_step(f"Environment name: {env_name}")
         print_step(f"Deployment type: {metadata['deployment_type']}")
-        print_step(f"Deployment version: {metadata['deployment_version']}")
         print_step(f"Onboarder version: {metadata['onboarder_version']}")
 
         # Print startup message
@@ -365,7 +361,6 @@ def run_interactive_shell(
         volume_mounts = [
             "-v", f"{DATA_DIR}:/docker-workspace/data:{selinux_opt}",
             "-v", f"{IMAGES_DIR}:/docker-workspace/images:{selinux_opt}",
-            "-v", f"{ENVIRONMENTS_DIR}:/docker-workspace/environments:{selinux_opt}",
         ]
 
         # Mount deployment file to /tmp/deployment.yml
@@ -392,11 +387,10 @@ def run_interactive_shell(
 
         # Build environment variables for the container
         env_vars = [
-            "-e", f"ENV_NAME={env_name}",
             "-e", f"DEPLOYMENT_TYPE={metadata['deployment_type']}",
-            "-e", f"DEPLOYMENT_VERSION={metadata['deployment_version']}",
             "-e", f"ONBOARDER_VERSION={metadata['onboarder_version']}",
             "-e", f"CONTAINER_WORKSPACE={CONTAINER_WORKSPACE}",
+            "-e", f"CONTAINER_DATA_DIR={DATA_DIR}",
             "-e", f"CONTAINER_INSTALL_DIR={CONTAINER_INSTALL_DIR}",
             "-e", f"FIRST_RUN_MARKER={FIRST_RUN_MARKER}",
         ]
@@ -473,9 +467,6 @@ Examples:
     # Verify directories exist
     if not DATA_DIR.exists():
         die(f"Data directory not found: {DATA_DIR}")
-
-    if not ENVIRONMENTS_DIR.exists():
-        die(f"Environments directory not found: {ENVIRONMENTS_DIR}")
 
     if not IMAGES_DIR.exists():
         die(f"Images directory not found: {IMAGES_DIR}")

@@ -17,7 +17,7 @@ tasks:
       - python3 {{.DATA_DIR}}/run_task.py 
           --task-id=bootstrap-mgmt-kvm 
           --hosts=mgmt_kvm 
-          --file={{.DEPLOYMENT_DIR}}/tasks/bootstrap-mgmt-kvm.yml 
+          --file={{.ONBOARDER_DIR}}/tasks/bootstrap-mgmt-kvm.yml 
           --kind=ansible
 
   configure-opnsense:
@@ -26,7 +26,7 @@ tasks:
       - python3 {{.DATA_DIR}}/run_task.py 
           --task-id=configure-opnsense 
           --hosts=localhost 
-          --file={{.DEPLOYMENT_DIR}}/tasks/configure-opnsense.yml 
+          --file={{.ONBOARDER_DIR}}/tasks/configure-opnsense.yml 
           --kind=ansible
 
   copy-opnsense-config:
@@ -35,7 +35,7 @@ tasks:
       - python3 {{.DATA_DIR}}/run_task.py 
           --task-id=copy-opnsense-config 
           --hosts=mgmt_kvm 
-          --file={{.DEPLOYMENT_DIR}}/tasks/copy-opnsense-config.yml 
+          --file={{.ONBOARDER_DIR}}/tasks/copy-opnsense-config.yml 
           --kind=ansible
 
   deploy-opnsense-vm:
@@ -54,7 +54,7 @@ tasks:
       - python3 {{.DATA_DIR}}/run_task.py 
           --task-id=deploy-vms 
           --hosts=mgmt_kvm 
-          --file={{.DEPLOYMENT_DIR}}/tasks/deploy-vms.yml 
+          --file={{.ONBOARDER_DIR}}/tasks/deploy-vms.yml 
           --kind=ansible
 
   configure-vm-partitions:
@@ -63,7 +63,7 @@ tasks:
       - python3 {{.DATA_DIR}}/run_task.py 
           --task-id=configure-vm-partitions 
           --hosts=clusters 
-          --file={{.DEPLOYMENT_DIR}}/tasks/configure-vm-partitions.yml 
+          --file={{.ONBOARDER_DIR}}/tasks/configure-vm-partitions.yml 
           --kind=ansible
 
   deploy-all:

@@ -8,14 +8,6 @@
 
 - name: Generate deployment configuration files
   hosts: localhost
-  gather_facts: yes
-  
-  vars:
-    env_name: "{{ env_name | mandatory }}"
-    install_dir: "/docker-workspace/config/install"
-    deployment_config: "{{ install_dir }}/deployment.yml"
-    ssh_dir: "{{ install_dir }}/.ssh"
-    templates_dir: "/docker-workspace/data/deployments/{{ deployment_type }}/{{ deployment_version }}/templates"
   
   tasks:
     # ==========================================================================
@@ -46,7 +38,6 @@
     #      - config.deployment is defined
     #      - config.deployment.name is defined
     #      - config.deployment.type is defined
-    #      - config.deployment.version is defined
     #      - config.ssh is defined
     #      - config.ssh.user is defined
     #      #- config.ssh.keys is defined
@@ -54,10 +45,9 @@
     #    fail_msg: "deployment.yml is missing required fields"
     #    success_msg: "✓ All required fields present in deployment.yml"
     
-    - name: Set deployment type and version for templates
+    - name: Set deployment type for templates
       set_fact:
         deployment_type: "{{ config.deployment.type }}"
-        deployment_version: "{{ config.deployment.version }}"
     
     # ==========================================================================
     # PHASE 2: Create Directory Structure
@@ -86,7 +76,7 @@
 
     - name: Ensure .ssh directory exists
       file:
-        path: "{{ ssh_dir }}"
+        path: "{{ install_dir }}/.ssh"
         state: directory
         mode: '0700'
     

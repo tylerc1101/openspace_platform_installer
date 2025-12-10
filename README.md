@@ -42,6 +42,8 @@ task deploy-all           # Deploy!
 Deploy to existing bare metal servers. Recommended for production environments.  
 *(Coming soon)*
 
+---
+
 ### [AWS Deployment](docs/DEPLOY_AWS.md)
 Cloud-based deployment.  
 *(Coming soon)*

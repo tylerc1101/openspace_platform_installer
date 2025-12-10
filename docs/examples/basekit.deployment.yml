@@ -92,8 +92,7 @@ management_cluster:
           mgmt_ip: "10.243.77.229"
           mgmt_interface: "enp1s0"
           idrac_ip: "192.168.0.8"
-          roles: ["controlplane", "etcd", "worker"]
-  
+
 # OSMS - OpenSpace Management System
 openspace_management_system:
   clusters:
@@ -104,7 +103,19 @@ openspace_management_system:
           mgmt_ip: "10.243.77.231"
           mgmt_interface: "enp1s0"
           idrac_ip: "192.168.0.9"
-          roles: ["controlplane", "etcd", "worker"]
+
+# OSDC - OpenSpace Data Cluster (optional)
+openspace_data_cluster:
+  clusters:
+    - cluster_name: "openspace-osdc"
+      ssh_key: "osdc_ssh_key"
+      nodes:
+        - name: "osdc1"
+          mgmt_ip: "192.168.2.16"
+          mgmt_interface: "eno1"
+        - name: "osdc2"
+          mgmt_ip: "192.168.2.17"
+          mgmt_interface: "eno1"
   
 # ==============================================================================
 # STORAGE CONFIGURATION

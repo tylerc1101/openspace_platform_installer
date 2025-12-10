@@ -69,38 +69,41 @@ mcm_nodes:
 
 # OpenSpace Management System (OSMS)
 {% if openspace_management_system is defined and openspace_management_system.clusters is defined %}
+osms_clusters:
 {% for cluster in openspace_management_system.clusters %}
-osms_cluster_name: "{{ cluster.cluster_name }}"
-{% if cluster.deployment_yaml is defined %}
-osms_deployment_yaml: "{{ cluster.deployment_yaml }}"
-{% endif %}
-osms_nodes:
+  - cluster_name: "{{ cluster.cluster_name }}"
+    ssh_key: "{{ cluster.ssh_key | default('id_rsa') }}"
+    vip_address: "{{ cluster.vip_address }}"
+    nodes:
 {% for node in cluster.nodes %}
-  - name: "{{ node.name }}"
-    mgmt_ip: "{{ node.mgmt_ip }}"
-    roles: {{ node.roles | to_json }}
-{% endfor %}
-{% endfor %}
+      - name: "{{ node.name }}"
+        mgmt_ip: "{{ node.mgmt_ip }}"
+        mgmt_interface: "{{ node.mgmt_interface }}"
+{% if node.idrac_ip is defined %}
+        idrac_ip: "{{ node.idrac_ip }}"
 {% endif %}
+{% endfor %}
+{% endfor %}
 
 # OpenSpace Data Cluster (OSDC)
 {% if openspace_datapath_cluster is defined and openspace_datapath_cluster.clusters is defined %}
+osdc_clusters:
 {% for cluster in openspace_datapath_cluster.clusters %}
-osdc_cluster_name: "{{ cluster.cluster_name }}"
-{% if cluster.deployment_yaml is defined %}
-osdc_deployment_yaml: "{{ cluster.deployment_yaml }}"
-{% endif %}
-osdc_nodes:
+  - cluster_name: "{{ cluster.cluster_name }}"
+    ssh_key: "{{ cluster.ssh_key | default('id_rsa') }}"
+    vip_address: "{{ cluster.vip_address }}"
+    nodes:
 {% for node in cluster.nodes %}
-  - name: "{{ node.name }}"
-    mgmt_ip: "{{ node.mgmt_ip }}"
-    roles: {{ node.roles | to_json }}
+      - name: "{{ node.name }}"
+        mgmt_ip: "{{ node.mgmt_ip }}"
+{% if node.idrac_ip is defined %}
+        idrac_ip: "{{ node.idrac_ip }}"
+{% endif %}
 {% if node.mac_address is defined %}
-    mac_address: "{{ node.mac_address }}"
+        mac_address: "{{ node.mac_address }}"
 {% endif %}
 {% endfor %}
 {% endfor %}
-{% endif %}
 
 # ==============================================================================
 # NTP Configuration

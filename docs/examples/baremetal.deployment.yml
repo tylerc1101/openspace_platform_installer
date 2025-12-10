@@ -43,15 +43,12 @@ management_cluster:
         - name: "srv01"
           mgmt_ip: "192.168.1.11"
           mgmt_interface: "eno1"
-          roles: ["controlplane", "etcd", "worker"]
         - name: "srv02"
           mgmt_ip: "192.168.1.12"
           mgmt_interface: "eno1"
-          roles: ["controlplane", "etcd", "worker"]
         - name: "srv03"
           mgmt_ip: "192.168.1.13"
           mgmt_interface: "eno1"
-          roles: ["controlplane", "etcd", "worker"]
 
 # OSMS - OpenSpace Management System (3 nodes for HA)
 openspace_management_system:
@@ -62,15 +59,12 @@ openspace_management_system:
         - name: "srv04"
           mgmt_ip: "192.168.1.14"
           mgmt_interface: "eno1"
-          roles: ["controlplane", "etcd", "worker"]
         - name: "srv05"
           mgmt_ip: "192.168.1.15"
           mgmt_interface: "eno1"
-          roles: ["controlplane", "etcd", "worker"]
         - name: "srv06"
           mgmt_ip: "192.168.1.16"
           mgmt_interface: "eno1"
-          roles: ["controlplane", "etcd", "worker"]
 
 # OSDC - OpenSpace Data Cluster (optional)
 openspace_data_cluster:
@@ -81,15 +75,12 @@ openspace_data_cluster:
         - name: "srv07"
           mgmt_ip: "192.168.1.17"
           mgmt_interface: "eno1"
-          roles: ["controlplane", "etcd", "worker"]
         - name: "srv08"
           mgmt_ip: "192.168.1.18"
           mgmt_interface: "eno1"
-          roles: ["controlplane", "etcd", "worker"]
         - name: "srv09"
           mgmt_ip: "192.168.1.19"
           mgmt_interface: "eno1"
-          roles: ["controlplane", "etcd", "worker"]
 
 storage:
   nfs:

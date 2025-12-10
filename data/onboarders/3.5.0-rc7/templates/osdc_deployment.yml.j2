@@ -1,0 +1,27 @@
+# ==============================================================================
+# OpenSpace Data Cluster Deployment - GENERATED FILE
+# ==============================================================================
+# Generated: {{ ansible_date_time.iso8601 }}
+# Cluster: {{ cluster_name }}
+# ==============================================================================
+
+apiVersion: openspace.kratos.us/v1alpha2
+kind: OpenspaceDataCluster
+metadata:
+  name: {{ cluster_name }}
+  namespace: openspace-system
+spec:
+  baremetalSpecs: {}
+  k8sDistro: v1.27.13+rke2r1
+  type: ssh
+  vipAddress: {{ cluster_vip }}
+  vipDNS: {{ cluster_name }}.{{ domain_name }}
+  sshSpec:
+    sshServers:
+{% for node in cluster_nodes %}
+    - name: {{ node.name }}
+      ipAddress: {{ node.mgmt_ip }}
+      secretRef:
+        name: {{ cluster_secret_name }}
+        namespace: openspace-system
+{% endfor %}

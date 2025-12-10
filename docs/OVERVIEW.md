@@ -2,101 +2,106 @@
 
 ## What It Does
 
-The OpenSpace Platform Installer (codename "Onboarder") is a stateful, containerized deployment orchestration system that automates complex OpenSpace infrastructure deployments using Taskfile-based workflows.
+The OpenSpace Platform Installer (codename "Onboarder") is a stateful, containerized deployment orchestration system that automates complex OpenSpace infrastructure deployments using a declarative configuration approach. Define your entire infrastructure in a single `deployment.yml` file, and the installer handles the rest.
 
 ## Key Capabilities
 
-### 1. Multi-Cluster Infrastructure Deployment
+### 1. Declarative Infrastructure Configuration
+- **Single source of truth**: All infrastructure defined in `<env>.deployment.yml`
+- **Automatic generation**: inventory, Taskfiles, variables, and SSH keys created from deployment.yml
+- **Version controlled**: Track infrastructure changes in git
+- **No manual configuration**: First-run script generates everything needed
+
+### 2. Multi-Cluster Infrastructure Deployment
 Deploy complete OpenSpace platform infrastructure:
-- **Base Infrastructure**: Management KVM hosts, networking, OPNsense firewalls
-- **MCM (Management Cluster)**: RKE2-based Kubernetes infrastructure cluster
+- **Base Infrastructure** (Basekit): Management KVM hosts, OPNsense firewalls, virtual machines, networking
+- **MCM (Management Cluster)**: RKE2-based Kubernetes with Harbor registry, Rancher, Gitea, and ArgoCD
 - **OSMS (OpenSpace Management System)**: Management plane cluster
 - **OSDC (OpenSpace Data Cluster)**: Data plane cluster
 
-### 2. Taskfile-Based Orchestration
-- Clear, readable YAML workflow definitions
-- Hierarchical task structure with dependencies
-- Modular taskfile includes for reusable components
-- Variable passing through task hierarchies
-- Built-in parallelization support
+### 3. Multiple Deployment Types
 
-### 3. Stateful Execution
+#### Basekit Deployment
+- Deploys full infrastructure from scratch on a management KVM host
+- Creates OPNsense firewall VM
+- Deploys MCM, OSMS, and OSDC as virtual machines
+- Configures networking and storage
+- Suitable for lab environments and proof-of-concepts
+
+#### Baremetal Deployment
+- Deploys to existing bare metal servers
+- Assumes servers are already provisioned
+- Configures OS and installs Kubernetes
+- Suitable for production environments
+
+#### AWS Deployment
+- Cloud-based deployment (future)
+- Provisions AWS resources
+- Deploys clusters to EC2 instances
+
+### 4. Containerized Execution Environment
+
+#### Container Features
+- **Isolated execution**: All deployments run in Podman/Docker container
+- **Consistent dependencies**: Pre-installed Ansible, Python, Task, and utilities
+- **Volume mounts**: Access to data, images, and environment configurations
+- **Air-gapped support**: Works in disconnected environments
+- **First-run initialization**: Automatic environment setup on first container start
+
+#### What's in the Container
+- Rocky Linux 9 base image
+- Python 3.9+
+- Ansible 2.14+
+- Task (Taskfile runner)
+- Required system utilities (jq, yq, etc.)
+- Custom RPMs for STIG compliance
+
+### 5. Stateful Execution
+
 The installer provides robust state management:
 - **Task tracking**: Completed tasks recorded in `.cache/state.json`
 - **Resume capability**: Automatically skip completed tasks on re-run
 - **Idempotent operations**: Safe to run tasks multiple times
 - **Granular control**: Reset state to re-run specific tasks
+- **Per-task logging**: Each task logs to `.cache/logs/task_<id>.log`
 
-### 4. Execution Features
+### 6. Real-Time Monitoring
 
-#### Containerized Environment
-- **Isolated execution**: All deployments run in Podman/Docker container
-- **Consistent dependencies**: Pre-installed Ansible, Python, Task, and utilities
-- **Volume mounts**: Access to data, images, and environment configurations
-- **Air-gapped support**: Works in disconnected environments
-
-#### Real-Time Monitoring
-- **Live output streaming**: See Ansible output as it happens
-- **Detailed logging**: Each task logs to `.cache/logs/task_<id>.log`
+#### Live Output Streaming
+- **Real-time feedback**: See Ansible output as it happens
 - **Progress tracking**: Clear indication of task completion
 - **Duration tracking**: Know how long each task takes
 
-#### Task Execution (run_task.py)
-- **State management**: Track completed tasks in JSON state file
-- **Multiple execution types**: Ansible playbooks, shell scripts, make commands
-- **Argument passing**: Extra vars and parameters to tasks
-- **Error handling**: Proper exit codes and error messages
+#### Detailed Logging
+- **Per-task logs**: Each task logs to `.cache/logs/task_<id>.log`
+- **Persistent logs**: Logs survive container restarts
+- **Structured state**: JSON state file for programmatic access
 
-### 5. Modular Design
+### 7. Versioned Onboarder Logic
 
-Task workflows are organized hierarchically:
-```
-Environment Taskfile.yml
-    ↓
-Included Taskfiles (basekit, cluster_deployment, node_prep)
-    ↓
-Individual Tasks (copy-ssh-key, deploy-cluster, etc.)
-    ↓
-run_task.py Execution
-    ↓
-Ansible Playbooks / Shell Scripts
-```
+Deployment logic is versioned in `data/onboarders/<version>/`:
+- **3.5.0-rc7**: Current release
+- **Future versions**: Can coexist, select in deployment.yml
+- **Separate concerns**: Deployment logic separate from environments
+- **Reproducible**: Same version produces same results
 
-Each component has a single responsibility:
-- **Environment Taskfile**: Orchestrates overall deployment flow
-- **Included Taskfiles**: Group related tasks by function
-- **Individual Tasks**: Perform specific operations
-- **run_task.py**: Execute tasks with state tracking
-- **Playbooks/Scripts**: Actual infrastructure automation
+### 8. Automatic Configuration Generation
 
-### 6. Variable Management
-
-Variables flow through multiple layers:
-- **Taskfile global vars**: Set once, used everywhere
-- **Include-level vars**: Passed to included taskfiles
-- **Task-level vars**: Specific to individual tasks
-- **Ansible vars**: In config.yml and group_vars/
-
-Variables are explicitly passed between tasks:
-```yaml
-parent-task:
-  vars:
-    HOSTS: infrastructure_cluster
-  cmds:
-    - task: child-task
-      vars:
-        HOSTS: '{{.HOSTS}}'
-```
+From a single deployment.yml, the system generates:
+- **inventory.yml**: Ansible inventory with all hosts and groups
+- **Taskfile.yml**: Environment-specific task orchestration
+- **group_vars/**: Ansible variables for all components
+- **.ssh/**: SSH key pairs for cluster access
+- **Network configs**: OPNsense firewall configuration (for basekit)
 
 ## Use Cases
 
 ### Initial Infrastructure Deployment
 Bootstrap complete OpenSpace infrastructure from scratch:
-1. Prepare management infrastructure
-2. Deploy MCM (Management Cluster) with RKE2
-3. Deploy OSMS (Management System) cluster
-4. Deploy OSDC (Data Cluster) cluster
-5. Configure networking and security
+1. Create deployment.yml configuration
+2. Launch onboarder container
+3. Run `task prep && task deploy-mcm`
+4. Deploy downstream clusters (OSMS, OSDC)
 
 ### Infrastructure Updates
 Apply changes to existing infrastructure:
@@ -108,7 +113,7 @@ Apply changes to existing infrastructure:
 ### Disaster Recovery
 Rebuild infrastructure from configuration:
 - All deployment logic is version-controlled
-- Environment configurations can be backed up
+- deployment.yml can be backed up
 - Reproducible deployments with consistent results
 
 ### Development and Testing
@@ -117,19 +122,103 @@ Test infrastructure changes safely:
 - Validate changes before production
 - Consistent deployment across dev/staging/prod
 
+## Workflows
+
+### Basekit Workflow (Full Infrastructure)
+
+```
+1. Create deployment.yml
+   ├─> Define networks
+   ├─> Define infrastructure hosts (mgmt_kvm, opnsense)
+   ├─> Define cluster nodes (MCM, OSMS, OSDC)
+   └─> Define VM specifications
+
+2. Launch container (python3 onboarder-run.py)
+   ├─> Select environment
+   ├─> First-run initialization (if new)
+   │   ├─> Generate inventory.yml
+   │   ├─> Generate Taskfile.yml
+   │   ├─> Generate group_vars/
+   │   └─> Generate SSH keys
+   └─> Drop into interactive shell
+
+3. Run deployment
+   ├─> task prep
+   │   └─> Prepare onboarder container
+   │
+   ├─> task deploy-mcm
+   │   ├─> Copy SSH keys to mgmt KVM
+   │   ├─> Bootstrap management KVM
+   │   ├─> Configure OPNsense firewall
+   │   ├─> Deploy OPNsense VM
+   │   ├─> Deploy cluster VMs (MCM, OSMS, OSDC)
+   │   ├─> Configure VM partitions
+   │   ├─> Copy SSH keys to cluster nodes
+   │   ├─> Prepare nodes (OS config, SELinux)
+   │   ├─> Deploy RKE2 cluster
+   │   ├─> Deploy Harbor registry
+   │   ├─> Deploy Rancher
+   │   ├─> Bootstrap Rancher with Terraform
+   │   ├─> Deploy Gitea
+   │   └─> Deploy ArgoCD
+   │
+   ├─> task deploy-prod-osms
+   │   ├─> Copy SSH keys to OSMS nodes
+   │   ├─> Prepare OSMS nodes
+   │   └─> Deploy OSMS cluster via Rancher
+   │
+   └─> task deploy-prod-osdc
+       ├─> Copy SSH keys to OSDC nodes
+       ├─> Prepare OSDC nodes
+       └─> Deploy OSDC cluster via Rancher
+
+4. Retrieve kubeconfigs
+   ├─> task get-kubeconfig-mcm
+   ├─> task get-kubeconfig-osms
+   └─> task get-kubeconfig-osdc
+```
+
+### Baremetal Workflow (Existing Servers)
+
+```
+1. Create deployment.yml
+   ├─> Define networks
+   ├─> Define cluster nodes (MCM, OSMS, OSDC)
+   └─> No VM specifications needed
+
+2. Launch container (python3 onboarder-run.py)
+   └─> (same as basekit)
+
+3. Run deployment
+   ├─> task prep
+   │
+   ├─> task deploy-mcm
+   │   ├─> Copy SSH keys to MCM nodes
+   │   ├─> Prepare nodes
+   │   ├─> Deploy RKE2 cluster
+   │   └─> Deploy platform components
+   │
+   ├─> task deploy-prod-osms
+   │   └─> (same as basekit)
+   │
+   └─> task deploy-prod-osdc
+       └─> (same as basekit)
+```
+
 ## Architecture Benefits
 
 ### Separation of Concerns
-- **Deployment logic** (data/) - reusable, version-controlled taskfiles
-- **Environment config** (environments/) - per-environment customization
+- **Deployment logic** (data/onboarders/) - reusable, version-controlled
+- **Deployment config** (deployment.yml) - declarative infrastructure definition
+- **Generated config** (environments/) - ephemeral, can be regenerated
 - **Images** (images/) - large binaries, separate repository
 - **Execution engine** (run_task.py) - state management and logging
 
 ### Maintainability
+- Single file defines infrastructure
 - Clear task hierarchy with explicit dependencies
-- Each task has single responsibility
-- Easy to add new tasks or modify existing ones
-- Readable YAML instead of complex Python code
+- Versioned deployment logic
+- Easy to update or rollback
 
 ### Reliability
 - State tracking prevents re-running completed work
@@ -139,6 +228,31 @@ Test infrastructure changes safely:
 
 ### Flexibility
 - Support multiple deployment types
-- Extensible taskfile system
+- Extensible onboarder system
 - Mix Ansible, shell, and other execution types
 - Easy to customize per environment
+
+## What Gets Deployed
+
+### MCM (Management Cluster)
+- **RKE2 Kubernetes**: Production-grade Kubernetes distribution
+- **Harbor**: Container image registry for air-gapped deployments
+- **Rancher**: Multi-cluster Kubernetes management
+- **Gitea**: Git source control for GitOps
+- **ArgoCD**: GitOps continuous delivery
+
+### OSMS (OpenSpace Management System)
+- Downstream Kubernetes cluster
+- Managed by Rancher
+- Management plane for OpenSpace applications
+
+### OSDC (OpenSpace Data Cluster)
+- Downstream Kubernetes cluster
+- Managed by Rancher
+- Data plane for OpenSpace workloads
+
+### Base Infrastructure (Basekit Only)
+- **Management KVM**: Hypervisor running all VMs
+- **OPNsense**: Firewall and router VM
+- **Virtual Machines**: MCM, OSMS, OSDC VMs
+- **Networking**: Bridges, VLANs, routing

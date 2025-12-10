@@ -2,16 +2,33 @@
 
 ## Overview
 
-The OpenSpace Platform Installer uses [Taskfile](https://taskfile.dev/) (aka Task, Go Task) for workflow orchestration. Taskfiles define deployment workflows as hierarchical tasks that can call other tasks, include external taskfiles, and pass variables between them.
+The OpenSpace Platform Installer uses [Taskfile](https://taskfile.dev/) (aka Task) for workflow orchestration. The system uses automatically-generated Taskfiles that define deployment workflows based on your `deployment.yml` configuration.
+
+## Key Concepts
+
+### Generated Taskfiles
+
+Taskfiles are **automatically generated** from your `deployment.yml` file:
+- Located in `environments/<env>/Taskfile.yml`
+- Created on first container run by `scripts/first-run.sh`
+- Regenerated when you delete `.first_run_complete` and restart container
+
+### Onboarder Taskfiles
+
+Pre-built taskfiles in `data/onboarders/<version>/`:
+- `main.yml` - Main orchestration tasks
+- `basekit.yml` - Basekit-specific deployment tasks
+- `baremetal.yml` - Baremetal-specific deployment tasks
+- These are included by your generated Taskfile.yml
 
 ## Why Taskfile?
 
-- **Simple YAML syntax**: Easy to read and write
-- **Task dependencies**: Clear declaration of what runs when
-- **Variable passing**: Clean variable inheritance through task hierarchies
-- **Includes**: Modular taskfile organization
-- **Platform agnostic**: Works anywhere (no Python/Node/Ruby needed)
-- **Built-in parallelization**: Run tasks concurrently where possible
+- **Simple YAML syntax**: Easy to read and modify
+- **Task dependencies**: Clear declaration of execution order
+- **Variable passing**: Configuration flows from deployment.yml
+- **Includes**: Modular organization with versioned onboarders
+- **Platform agnostic**: Works in any environment
+- **Built-in parallelization**: Run independent tasks concurrently
 
 ## Taskfile Structure
 
@@ -57,61 +74,66 @@ tasks:
       - echo "Installing dependencies"
 ```
 
-## Environment Taskfile
+## Generated Environment Taskfile
 
-Each environment has a main `Taskfile.yml` that orchestrates the full deployment:
+Your environment's `Taskfile.yml` is automatically generated from `deployment.yml`. Here's an example of what it looks like:
 
 ```yaml
-# environments/afcgi/skcp_bottom/Taskfile.yml
+# environments/myenv/Taskfile.yml (GENERATED - DO NOT EDIT MANUALLY)
 version: '3'
 
 vars:
-  ENV: afcgi/skcp_bottom
+  ENV: myenv
   DATA_DIR: /docker-workspace/data
-  DEPLOYMENT_TYPE: basekit
-  DEPLOYMENT_VERSION: 1.0.1
+  DEPLOYMENT_TYPE: basekit  # From deployment.yml deployment.type
+  ONBOARDER_VERSION: 3.5.0-rc7  # From deployment.yml deployment.onboarder_version
 
 includes:
-  deployment:
-    taskfile: ../../../data/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/main.yml
+  onboarder:
+    taskfile: ../../data/onboarders/{{.ONBOARDER_VERSION}}/main.yml
     vars:
       ENV: '{{.ENV}}'
       DATA_DIR: '{{.DATA_DIR}}'
-      
-  node-prep:
-    taskfile: ../../../data/node_prep/1.0.1/main.yml
-    vars:
-      DATA_DIR: '{{.DATA_DIR}}'
-      
-  cluster_deployment:
-    taskfile: ../../../data/cluster_deployment/1.0.1/main.yml
-    vars:
-      DATA_DIR: '{{.DATA_DIR}}'
+      DEPLOYMENT_TYPE: '{{.DEPLOYMENT_TYPE}}'
 
 tasks:
   prep:
     desc: Complete environment preparation workflow
     cmds:
-      - task: prep-onboarder-container
-      - task: run-deployment-setup
+      - task: onboarder:prep-onboarder-container
 
   deploy-mcm:
     desc: Deploy Management Cluster (MCM)
     cmds:
-      - task: infrastructure_cluster_prep
-      - task: infrastructure_node_prep
-      - task: run-onboarder
+      - task: onboarder:deploy-mcm-{{.DEPLOYMENT_TYPE}}
 
-  infrastructure_cluster_prep:
-    desc: Run Infrastructure Cluster Preparation Tasks
+  deploy-prod-osms:
+    desc: Deploy OSMS Cluster
     cmds:
-      - task: copy-ssh-key
-        vars:
-          HOSTS: infrastructure_cluster
-      - task: deployment:deploy-all
-        vars:
-          HOSTS: infrastructure_cluster
+      - task: onboarder:deploy-osms
+
+  deploy-prod-osdc:
+    desc: Deploy OSDC Cluster (if configured)
+    cmds:
+      - task: onboarder:deploy-osdc
+
+  get-kubeconfig-mcm:
+    desc: Retrieve MCM kubeconfig
+    cmds:
+      - task: onboarder:get-kubeconfig-mcm
+
+  get-kubeconfig-osms:
+    desc: Retrieve OSMS kubeconfig
+    cmds:
+      - task: onboarder:get-kubeconfig-osms
+
+  get-kubeconfig-osdc:
+    desc: Retrieve OSDC kubeconfig
+    cmds:
+      - task: onboarder:get-kubeconfig-osdc
 ```
+
+**Important**: This file is generated. To modify it, update your `deployment.yml` and regenerate configuration.
 
 ## Included Taskfiles
 

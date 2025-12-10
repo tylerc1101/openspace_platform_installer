@@ -1,179 +1,229 @@
 # Getting Started
 
-## Quick Start Guide
+This guide walks you through your first deployment with the OpenSpace Platform Installer.
 
-### 1. Prepare Your Environment
+## Prerequisites
 
-#### Ensure Required Repositories
+Before you begin, ensure you have:
+- Docker or Podman installed
+- Python 3.9+ installed
+- Network access to target infrastructure
+- See [Requirements](REQUIREMENTS.md) for full details
+
+## Quick Start Overview
+
+1. Create a deployment.yml configuration file
+2. Launch the onboarder container
+3. Run the deployment tasks
+4. Retrieve kubeconfigs
+
+## Step 1: Create Your Deployment Configuration
+
+### Copy the Sample Configuration
+
 ```bash
-# Ensure you have both repositories
-ls -la
-# You should see:
-# openspace_platform_installer/
-# openspace_platform_installer_images/
+# Create environment directory
+mkdir -p environments/myenv
+
+# Copy sample deployment configuration
+cp test.deployment.yml environments/myenv/myenv.deployment.yml
 ```
 
-#### Create Your Environment Directory
+### Edit Your deployment.yml
+
 ```bash
-cd openspace_platform_installer
-
-# Create environment structure
-mkdir -p environments/<your_environment>
-cd environments/<your_environment>
-
-# Create required directories
-mkdir -p group_vars
-mkdir -p .ssh
-mkdir -p .cache/logs
-
-# Create configuration files
-touch Taskfile.yml
-touch config.yml
-touch group_vars/all.yml
+vim environments/myenv/myenv.deployment.yml
 ```
 
-### 2. Configure Your Deployment
+The deployment.yml file has several key sections. Here's a minimal example:
 
-#### Create Main Taskfile (`Taskfile.yml`)
 ```yaml
-version: '3'
+deployment:
+  name: "my-deployment"
+  type: "basekit"  # or "baremetal"
+  onboarder_version: "3.5.0-rc7"
+  osms_tooling_version: "1.8.x"
 
-vars:
-  ENV: <your_environment>
-  DATA_DIR: /docker-workspace/data
-  DEPLOYMENT_TYPE: basekit
-  DEPLOYMENT_VERSION: 1.0.1
+ssh:
+  user: "rancher"
+  pass: "your-password"
+  become: "rancher"
 
-includes:
-  deployment:
-    taskfile: ../../data/{{.DEPLOYMENT_TYPE}}/{{.DEPLOYMENT_VERSION}}/main.yml
-    vars:
-      ENV: '{{.ENV}}'
-      DATA_DIR: '{{.DATA_DIR}}'
-      
-  node-prep:
-    taskfile: ../../data/node_prep/1.0.1/main.yml
-    vars:
-      DATA_DIR: '{{.DATA_DIR}}'
+networks:
+  customer:
+    gateway: "10.10.10.1"
+    cidr: "/24"
+    dns_servers:
+      - "8.8.8.8"
+  management:
+    network: "192.168.1"
+    cidr: "/24"
 
-tasks:
-  prep:
-    desc: Complete environment preparation workflow
-    cmds:
-      - task: prep-onboarder-container
-      - task: run-deployment-setup
+# For basekit deployments
+infrastructure:
+  mgmt_kvm:
+    wan_ip: "10.10.10.10"
+    mgmt_ip: "192.168.1.1"
+  opnsense:
+    wan_ip: "10.10.10.1"
+    mgmt_ip: "192.168.1.254"
 
-  deploy-mcm:
-    desc: Deploy Management Cluster
-    cmds:
-      - task: infrastructure_cluster_prep
-      - task: infrastructure_node_prep
-      - task: run-onboarder
+# MCM cluster nodes
+management_cluster:
+  clusters:
+    - cluster_name: "local"
+      ssh_key: "mcm_ssh_key"
+      nodes:
+        - name: "mcm1"
+          mgmt_ip: "192.168.1.10"
+          roles: ["controlplane", "etcd", "worker"]
+
+# OSMS cluster nodes
+openspace_management_system:
+  clusters:
+    - cluster_name: "osms"
+      ssh_key: "osms_ssh_key"
+      nodes:
+        - name: "osms1"
+          mgmt_ip: "192.168.1.20"
+          roles: ["controlplane", "etcd", "worker"]
+
+# For basekit: VM specifications
+virtual_machines:
+  mcm:
+    memory: 16384
+    vcpus: 8
+    disk_size: 100
+    backing_store: "/var/lib/libvirt/images/rocky9.qcow2"
+  osms:
+    memory: 16384
+    vcpus: 8
+    disk_size: 100
+    backing_store: "/var/lib/libvirt/images/rocky9.qcow2"
 ```
 
-#### Edit Ansible Inventory (`config.yml`)
-```yaml
-all:
-  children:
-    infrastructure_cluster:
-      hosts:
-        mcm1:
-          ansible_host: 192.168.1.10
-          ansible_user: rancher
-          ansible_ssh_private_key_file: /docker-workspace/config/install/.ssh/rancher_ssh_key
-    
-    downstream_clusters:
-      hosts:
-        osms1:
-          ansible_host: 192.168.2.20
-        osdc1:
-          ansible_host: 192.168.2.21
-```
+See [Configuration Guide](CONFIGURATION.md) for complete documentation of all deployment.yml options.
 
-#### Configure Variables (`group_vars/all.yml`)
-```yaml
-# Cluster configuration
-cluster_domain: "example.com"
+## Step 2: Launch the Onboarder Container
 
-# Network settings
-dns_servers:
-  - "8.8.8.8"
-  - "8.8.4.4"
-
-# Deployment settings
-rke2_version: "v1.28.0+rke2r1"
-rancher_version: "2.8.0"
-```
-
-### 3. Set Up SSH Keys
+### Start the Container
 
 ```bash
-# Generate SSH key pair if needed
-ssh-keygen -t rsa -b 4096 -f .ssh/rancher_ssh_key -N ""
-
-# Copy public key to target systems
-ssh-copy-id -i .ssh/rancher_ssh_key.pub rancher@192.168.1.10
-
-# Set proper permissions
-chmod 700 .ssh
-chmod 600 .ssh/rancher_ssh_key
-chmod 644 .ssh/rancher_ssh_key.pub
-```
-
-### 4. Start Container and Setup Environment
-
-```bash
-# From repository root
 python3 onboarder-run.py
-
-# Inside container, symlink your environment to 'install'
-cd /docker-workspace
-ln -s config/<your_environment> install
-cd install
 ```
 
-### 5. Run the Deployment
+The script will:
+1. Detect your container runtime (Podman or Docker)
+2. Show a menu of available environments (finds all *.deployment.yml files)
+3. Load or build the onboarder container image
+4. Mount necessary volumes
+5. Start an interactive shell inside the container
 
-#### List Available Tasks
+### What Happens on First Run
+
+If this is the first time running your environment, the container will automatically:
+1. Create the install directory structure
+2. Copy your deployment.yml into the container
+3. Generate all configuration files from deployment.yml:
+   - `inventory.yml` - Ansible inventory
+   - `Taskfile.yml` - Task orchestration workflow
+   - `group_vars/all.yml` - Ansible variables
+   - `.ssh/` - SSH key pairs
+4. Run prep_onboarder_container.yml playbook
+5. Mark environment as initialized
+
+This is all done by the `scripts/first-run.sh` script.
+
+### Inside the Container
+
+You'll see a prompt like:
+```
+[onboarder@container install]$
+```
+
+You're now in `/docker-workspace/install`, which is linked to your environment directory.
+
+## Step 3: Verify Generated Configuration
+
+Before deploying, take a moment to verify the generated configuration:
+
+### Check Generated Inventory
+
 ```bash
-# See all available tasks
+cat inventory.yml
+```
+
+You should see all your hosts organized into groups like:
+- `infrastructure_cluster` (MCM nodes)
+- `osms` (OSMS nodes)
+- `osdc` (OSDC nodes, if configured)
+
+### Check Generated Taskfile
+
+```bash
+cat Taskfile.yml
+```
+
+This file defines the deployment workflow tasks.
+
+### Check Generated SSH Keys
+
+```bash
+ls -la .ssh/
+```
+
+You should see SSH key pairs that were automatically generated.
+
+## Step 4: Run the Deployment
+
+### List Available Tasks
+
+```bash
 task --list
-
-# See task descriptions
-task --list-all
 ```
 
-#### Run Full Deployment
+You'll see tasks like:
+- `prep` - Prepare environment
+- `deploy-mcm` - Deploy management cluster
+- `deploy-prod-osms` - Deploy OSMS cluster
+- `deploy-prod-osdc` - Deploy OSDC cluster
+
+### Full Deployment Workflow
+
+For a complete basekit deployment from scratch:
+
 ```bash
-# Complete workflow
-task prep                    # Prepare environment
-task deploy-mcm             # Deploy management cluster
-task deploy-prod-osms       # Deploy OSMS cluster
-task deploy-prod-osdc       # Deploy OSDC cluster
-```
+# Step 1: Prepare environment
+task prep
 
-#### Run Individual Phases
-```bash
-# Infrastructure preparation
-task infrastructure_cluster_prep
-
-# Node preparation
-task infrastructure_node_prep
-
-# Onboarder deployment
-task run-onboarder
-```
-
-### 6. Monitor Progress
-
-The deployment provides real-time output and detailed logging:
-
-#### Real-time Output
-```bash
-# Task execution shows live output
+# Step 2: Deploy MCM (includes VM creation for basekit)
 task deploy-mcm
 
-# Output streams in real-time as Ansible runs
+# Step 3: Deploy OSMS
+task deploy-prod-osms
+
+# Step 4: Deploy OSDC (if configured)
+task deploy-prod-osdc
+```
+
+### For Baremetal Deployments
+
+The workflow is the same, but VMs are not created:
+
+```bash
+task prep
+task deploy-mcm
+task deploy-prod-osms
+task deploy-prod-osdc
+```
+
+## Step 5: Monitor Progress
+
+### Real-Time Output
+
+Tasks stream output in real-time as they execute. You'll see Ansible playbook output directly:
+
+```
 TASK [Copy SSH Key] ************************************************************
 ok: [mcm1]
 
@@ -181,115 +231,307 @@ PLAY RECAP *********************************************************************
 mcm1                       : ok=5    changed=2    unreachable=0    failed=0
 ```
 
-#### Check Logs
+### Check Logs
+
+Each task creates a log file:
+
 ```bash
-# View logs directory
+# List logs
 ls -lh .cache/logs/
 
-# Tail specific task log
+# View specific task log
 tail -f .cache/logs/task_copy-ssh-key.log
 
-# View state tracking
+# View logs for currently running task
+tail -f .cache/logs/task_*.log
+```
+
+### Check State
+
+The state file tracks completed tasks:
+
+```bash
 cat .cache/state.json
 ```
 
-### 7. Resume After Interruption
-
-Tasks automatically track completion state:
-
-```bash
-# If deployment stops, just re-run the task
-task deploy-mcm
-
-# Completed tasks are skipped
-# Only incomplete/failed tasks will run
+Example state file:
+```json
+{
+  "completed_tasks": {
+    "copy-ssh-key-mcm": {
+      "completed_at": "2025-12-10T10:30:00Z",
+      "duration_seconds": 5.2,
+      "status": "success"
+    }
+  }
+}
 ```
 
-#### Manual State Reset
+## Step 6: Handle Interruptions
+
+### Automatic Resume
+
+If a task fails or is interrupted, just re-run the same command:
+
 ```bash
-# Clear state to re-run all tasks
+task deploy-mcm
+```
+
+The installer will:
+- Load the state file
+- Skip completed tasks
+- Resume from where it left off
+
+### Manual State Reset
+
+To start fresh and re-run all tasks:
+
+```bash
+# Remove state file
 rm .cache/state.json
 
-# Now all tasks will run fresh
+# All tasks will run again
 task deploy-mcm
 ```
 
-## Next Steps
+## Step 7: Retrieve Kubeconfigs
 
-Once your initial deployment completes:
+After deployment completes, download the kubeconfig files:
 
-1. **Verify Infrastructure**: SSH to deployed systems and verify services
-2. **Review Logs**: Check `.cache/logs/` for any warnings
-3. **Explore Tasks**: Use `task --list` to see all available operations
-4. **Customize Workflow**: Modify `Taskfile.yml` to add custom tasks
-5. **Version Control**: Commit your environment configuration (excluding secrets!)
-6. **Document Environment**: Add README to your environment directory
+```bash
+# Get MCM kubeconfig
+task get-kubeconfig-mcm
+
+# Get OSMS kubeconfig
+task get-kubeconfig-osms
+
+# Get OSDC kubeconfig (if deployed)
+task get-kubeconfig-osdc
+```
+
+Kubeconfigs are saved to your environment directory and can be used from your host:
+
+```bash
+# Exit container
+exit
+
+# On host, use kubeconfigs
+export KUBECONFIG=environments/myenv/kubeconfig-mcm
+kubectl get nodes
+```
 
 ## Common First-Time Issues
 
-### Container Not Starting
+### Issue: Container Fails to Start
+
+```
+Error: Cannot start container
+```
+
+**Possible causes:**
+- Docker/Podman not running
+- Insufficient permissions
+- Port conflicts
+
+**Solution:**
 ```bash
-# Ensure Docker/Podman is running
+# Check Docker/Podman status
+sudo systemctl status docker
+# or
 sudo systemctl status podman
 
-# Check for image
-podman images | grep onboarder
+# Start if needed
+sudo systemctl start docker
+
+# Add user to docker group
+sudo usermod -aG docker $USER
+# Log out and back in for group changes to take effect
 ```
 
-### Task Not Found
+### Issue: Environment Not Found
+
 ```
-Error: task: Task "deploy-mcm" not found
+No deployment.yml files found in environments/
 ```
-**Solution**: Ensure you're in the correct directory with Taskfile.yml:
+
+**Solution:**
+Make sure your deployment file is named correctly:
 ```bash
-cd /docker-workspace/install
-task --list
+# Must end with .deployment.yml
+ls environments/myenv/*.deployment.yml
 ```
 
-### SSH Connection Fails
+### Issue: Task Not Found
+
+```
+task: Task "deploy-mcm" not found
+```
+
+**Possible causes:**
+- Not in the correct directory
+- Taskfile.yml not generated
+
+**Solution:**
+```bash
+# Make sure you're in install directory
+cd /docker-workspace/install
+pwd  # Should show /docker-workspace/install
+
+# Check if Taskfile.yml exists
+ls -la Taskfile.yml
+
+# If missing, regenerate configs
+# First delete marker file
+rm .first_run_complete
+# Exit and restart container
+```
+
+### Issue: SSH Connection Fails
+
 ```
 FAILED! => {"msg": "Failed to connect to the host via ssh: Permission denied"}
 ```
 
-**Solution**: Test SSH manually first:
+**Possible causes:**
+- Wrong IP address in deployment.yml
+- Wrong SSH credentials
+- Target host not accessible
+
+**Solution:**
 ```bash
-# Test from inside container
-ssh -i .ssh/rancher_ssh_key rancher@target-host
+# Test SSH manually from inside container
+ssh -i .ssh/mcm_ssh_key rancher@192.168.1.10
 
-# Check key permissions
-ls -la .ssh/
-chmod 600 .ssh/rancher_ssh_key
+# If that fails, check:
+# 1. IP address is correct
+# 2. Target host is reachable
+# 3. SSH credentials are correct in deployment.yml
 ```
 
-### Ansible Inventory Not Found
+### Issue: Ansible Playbook Fails
+
 ```
-ERROR! Unable to retrieve file contents
+FAILED! => {"msg": "Some error message"}
 ```
 
-**Solution**: Ensure config.yml exists and symlink is correct:
+**Solution:**
+1. Check the detailed error message in the log file
+2. Check `.cache/logs/task_<id>.log` for full error
+3. Fix the issue (often network, permissions, or configuration)
+4. Re-run the task - it will resume from where it failed
+
+## Next Steps
+
+Once your deployment completes:
+
+1. **Access Your Clusters**
+   ```bash
+   # Use kubeconfigs to access clusters
+   kubectl --kubeconfig=kubeconfig-mcm get nodes
+   ```
+
+2. **Access Rancher**
+   - Find Rancher URL in MCM cluster
+   - Login with bootstrap credentials
+
+3. **Deploy Applications**
+   - Use ArgoCD for GitOps deployments
+   - Use Rancher for cluster management
+
+4. **Explore Tasks**
+   ```bash
+   task --list-all
+   ```
+
+5. **Customize Deployment**
+   - Modify deployment.yml for your needs
+   - Regenerate config and redeploy
+
+## Tips for Success
+
+### Use Version Control
+
 ```bash
-ls -la /docker-workspace/install/config.yml
-ls -la /docker-workspace/config/<your_env>/config.yml
+# Track your deployment configuration
+cd environments/myenv
+git init
+git add myenv.deployment.yml
+git commit -m "Initial deployment configuration"
+
+# DO NOT commit generated files or secrets
+echo "inventory.yml" >> .gitignore
+echo "Taskfile.yml" >> .gitignore
+echo "group_vars/" >> .gitignore
+echo ".ssh/" >> .gitignore
+echo ".cache/" >> .gitignore
 ```
 
-### Variable Not Defined
-```
-Error: required variable HOSTS is not set
-```
+### Document Your Environment
 
-**Solution**: Check task requirements and pass variables:
-```yaml
-# In Taskfile.yml
-task: subtask
-vars:
-  HOSTS: '{{.HOSTS}}'
-```
+Create a README in your environment directory:
 
-### State File Issues
 ```bash
-# If state tracking seems wrong, reset it
-rm .cache/state.json
+cat > environments/myenv/README.md <<EOF
+# My Environment
 
-# Re-run tasks fresh
+Deployment: my-deployment
+Type: basekit
+Onboarder Version: 3.5.0-rc7
+
+## Networks
+- Customer: 10.10.10.0/24
+- Management: 192.168.1.0/24
+
+## Clusters
+- MCM: 192.168.1.10
+- OSMS: 192.168.1.20
+- OSDC: 192.168.1.30
+
+## Deployment Commands
+\`\`\`
+python3 onboarder-run.py
+task prep && task deploy-mcm && task deploy-prod-osms
+\`\`\`
+EOF
+```
+
+### Test in Stages
+
+Don't run all tasks at once on first deployment. Run step by step:
+
+```bash
+# Run and verify each phase
+task prep
+# Verify prep succeeded
+
 task deploy-mcm
+# Verify MCM is healthy
+
+task deploy-prod-osms
+# Verify OSMS is healthy
 ```
+
+### Keep Logs
+
+Logs are valuable for troubleshooting:
+
+```bash
+# Archive logs after successful deployment
+tar -czf logs-$(date +%Y%m%d).tar.gz .cache/logs/
+```
+
+## Getting Help
+
+If you run into issues:
+
+1. Check logs in `.cache/logs/`
+2. Review [Troubleshooting Guide](TROUBLESHOOTING.md)
+3. Check [Configuration Reference](CONFIGURATION.md)
+4. Review [Architecture Documentation](ARCHITECTURE.md)
+
+## What's Next?
+
+- [Configuration Reference](CONFIGURATION.md) - Learn all deployment.yml options
+- [Taskfiles Guide](TASKFILES.md) - Understand the task system
+- [Architecture](ARCHITECTURE.md) - Deep dive into how it works
+- [Troubleshooting](TROUBLESHOOTING.md) - Fix common issues

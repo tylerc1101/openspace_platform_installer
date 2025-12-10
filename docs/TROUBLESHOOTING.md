@@ -2,28 +2,45 @@
 
 ## General Debugging Approach
 
-### 1. Check Validation First
+### 1. Check Logs
 ```bash
-python3 onboarder-run.py --env=<env> --validate-only
+# Inside container, in install directory
+cd /docker-workspace/install
+
+# List all logs
+ls -lh .cache/logs/
+
+# View specific task log
+tail -f .cache/logs/task_<id>.log
+
+# View most recent log
+ls -t .cache/logs/ | head -1 | xargs -I {} tail -f .cache/logs/{}
 ```
 
-### 2. Run with Verbose Output
+### 2. Check State
 ```bash
-python3 onboarder-run.py --env=<env> --verbose
+# View current state
+cat .cache/state.json
+
+# See which tasks have completed
+jq '.completed_tasks | keys' .cache/state.json
 ```
 
-### 3. Review Logs
+### 3. Validate deployment.yml
 ```bash
-# Main orchestrator log
-tail -f usr_home/<env>/logs/main_orchestrator.log
+# Check YAML syntax
+python3 -c "import yaml; yaml.safe_load(open('environments/myenv/myenv.deployment.yml'))"
 
-# Specific step log
-cat usr_home/<env>/logs/step_3_deploy_vms.log
+# Or use yamllint
+yamllint environments/myenv/myenv.deployment.yml
 ```
 
-### 4. Check State File
+### 4. Check Generated Configuration
 ```bash
-cat usr_home/<env>/.installer_state
+# Inside container
+cat inventory.yml
+cat Taskfile.yml
+cat group_vars/all.yml
 ```
 
 ## Common Issues

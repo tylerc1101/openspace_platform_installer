@@ -1,0 +1,100 @@
+---
+# Baremetal Deployment Example
+# For deploying to existing bare metal servers
+
+deployment:
+  name: "production-baremetal"
+  type: "baremetal"
+  onboarder_version: "3.5.0-rc7"
+  osms_tooling_version: "1.8.x"
+
+ssh:
+  user: "rancher"
+  pass: "CHANGE_ME"
+  become: "rancher"
+
+networks:
+  customer:
+    gateway: "10.10.10.1"
+    cidr: "/24"
+    dns_servers:
+      - "8.8.8.8"
+      - "8.8.4.4"
+  management:
+    network: "192.168.1"
+    cidr: "/24"
+    dns_servers:
+      - "8.8.8.8"
+      - "8.8.4.4"
+
+domain:
+  base: "prod.example.com"
+
+ntp:
+  server: "pool.ntp.org"
+  timezone: "Etc/UTC"
+
+# MCM - Management Cluster (3 nodes for HA)
+management_cluster:
+  clusters:
+    - cluster_name: "local"
+      ssh_key: "mcm_ssh_key"
+      nodes:
+        - name: "srv01"
+          mgmt_ip: "192.168.1.11"
+          mgmt_interface: "eno1"
+          roles: ["controlplane", "etcd", "worker"]
+        - name: "srv02"
+          mgmt_ip: "192.168.1.12"
+          mgmt_interface: "eno1"
+          roles: ["controlplane", "etcd", "worker"]
+        - name: "srv03"
+          mgmt_ip: "192.168.1.13"
+          mgmt_interface: "eno1"
+          roles: ["controlplane", "etcd", "worker"]
+
+# OSMS - OpenSpace Management System (3 nodes for HA)
+openspace_management_system:
+  clusters:
+    - cluster_name: "osms"
+      ssh_key: "osms_ssh_key"
+      nodes:
+        - name: "srv04"
+          mgmt_ip: "192.168.1.14"
+          mgmt_interface: "eno1"
+          roles: ["controlplane", "etcd", "worker"]
+        - name: "srv05"
+          mgmt_ip: "192.168.1.15"
+          mgmt_interface: "eno1"
+          roles: ["controlplane", "etcd", "worker"]
+        - name: "srv06"
+          mgmt_ip: "192.168.1.16"
+          mgmt_interface: "eno1"
+          roles: ["controlplane", "etcd", "worker"]
+
+# OSDC - OpenSpace Data Cluster (optional)
+openspace_data_cluster:
+  clusters:
+    - cluster_name: "osdc"
+      ssh_key: "osdc_ssh_key"
+      nodes:
+        - name: "srv07"
+          mgmt_ip: "192.168.1.17"
+          mgmt_interface: "eno1"
+          roles: ["controlplane", "etcd", "worker"]
+        - name: "srv08"
+          mgmt_ip: "192.168.1.18"
+          mgmt_interface: "eno1"
+          roles: ["controlplane", "etcd", "worker"]
+        - name: "srv09"
+          mgmt_ip: "192.168.1.19"
+          mgmt_interface: "eno1"
+          roles: ["controlplane", "etcd", "worker"]
+
+storage:
+  nfs:
+    enabled: true
+    server: "192.168.1.100"
+    path: "/exports/kubernetes"
+
+# Note: No infrastructure or virtual_machines sections for baremetal deployments

@@ -58,7 +58,6 @@
         size: 4096
         state: present
         force: false
-        comment: "rancher@{{ env_name }}"
       register: ssh_key_generated
 
     - name: Set proper permissions on SSH private key

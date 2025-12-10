@@ -1,588 +1,420 @@
 # Troubleshooting Guide
 
-## General Debugging Approach
+Quick fixes for common issues.
+
+## General Debugging Steps
 
 ### 1. Check Logs
+
 ```bash
-# Inside container, in install directory
+# Inside container
 cd /docker-workspace/install
-
-# List all logs
-ls -lh .cache/logs/
-
-# View specific task log
-tail -f .cache/logs/task_<id>.log
 
 # View most recent log
 ls -t .cache/logs/ | head -1 | xargs -I {} tail -f .cache/logs/{}
+
+# Or specific task
+tail -f .cache/logs/task_<task-name>.log
 ```
 
-### 2. Check State
+### 2. Check What's Completed
+
 ```bash
-# View current state
+# View state
 cat .cache/state.json
 
-# See which tasks have completed
+# List completed tasks
 jq '.completed_tasks | keys' .cache/state.json
 ```
 
-### 3. Validate deployment.yml
-```bash
-# Check YAML syntax
-python3 -c "import yaml; yaml.safe_load(open('environments/myenv/myenv.deployment.yml'))"
+### 3. Reset and Retry
 
-# Or use yamllint
-yamllint environments/myenv/myenv.deployment.yml
-```
-
-### 4. Check Generated Configuration
 ```bash
-# Inside container
-cat inventory.yml
-cat Taskfile.yml
-cat group_vars/all.yml
+# Start fresh
+rm .cache/state.json
+task deploy-mcm
 ```
 
 ## Common Issues
 
-### Configuration Issues
+### Container Won't Start
 
-#### Profile Not Found
-```
-Error: Profile 'basekit/custom' not found at data/profiles/basekit/custom.yml
-```
+**Error:** `Cannot start container` or `Permission denied`
 
-**Causes:**
-- Typo in `profile_name` in group_vars/basekit.yml
-- Profile file doesn't exist
-- Wrong directory structure
-
-**Solution:**
+**Fix:**
 ```bash
-# Check what profiles exist
-ls -la data/profiles/basekit/
-
-# Verify profile_name setting
-cat usr_home/<env>/group_vars/basekit.yml | grep profile_name
-
-# Create missing profile or fix typo
-vim usr_home/<env>/group_vars/basekit.yml
-```
-
-#### Invalid YAML Syntax
-```
-Error: Invalid YAML in config.yml: mapping values are not allowed here
-```
-
-**Causes:**
-- Incorrect indentation
-- Missing colons or quotes
-- Invalid characters
-
-**Solution:**
-```bash
-# Check YAML syntax
-python3 -c "import yaml; yaml.safe_load(open('usr_home/<env>/config.yml'))"
-
-# Use a YAML linter
-yamllint usr_home/<env>/config.yml
-```
-
-#### Missing Required Variables
-```
-Error: Variable 'cluster_domain' is not defined
-```
-
-**Causes:**
-- Variable referenced in playbook but not defined
-- Typo in variable name
-- Variable in wrong file
-
-**Solution:**
-```bash
-# Search for variable definitions
-grep -r "cluster_domain" usr_home/<env>/group_vars/
-
-# Add missing variable
-vim usr_home/<env>/group_vars/basekit.yml
-```
-
-#### Variable Substitution Not Working
-```
-Error: File not found: tasks/{profile_kind}/task.yml
-```
-
-**Causes:**
-- Wrong substitution syntax ({{ }} instead of { })
-- Variable not available at substitution time
-- Misspelled variable name
-
-**Solution:**
-```yaml
-# Correct syntax for profile substitutions
-file: "tasks/{profile_kind}/task.yml"  # ✅ Correct
-
-# Wrong syntax
-file: "tasks/{{ profile_kind }}/task.yml"  # ❌ Wrong
-```
-
-### Container Issues
-
-#### Container Build Fails
-```
-Error: Failed to build container image
-```
-
-**Causes:**
-- Docker/Podman not running
-- Network issues downloading base image
-- Insufficient disk space
-
-**Solution:**
-```bash
-# Check Docker/Podman status
+# Check Docker/Podman is running
 sudo systemctl status docker
 # or
 sudo systemctl status podman
 
-# Try building manually
-cd data
-docker build -t onboarder:1.0.0 .
-
-# Check disk space
-df -h
-```
-
-#### Container Start Fails
-```
-Error: Cannot start container: permission denied
-```
-
-**Causes:**
-- SELinux blocking access
-- Wrong permissions on mounted directories
-- User doesn't have Docker/Podman permissions
-
-**Solution:**
-```bash
-# Check SELinux (if enabled)
-getenforce
-# Temporarily set to permissive for testing
-sudo setenforce 0
-
-# Fix directory permissions
-chmod 755 usr_home/<env>
-chmod 700 usr_home/<env>/.ssh
-chmod 600 usr_home/<env>/.ssh/id_rsa
+# Start if needed
+sudo systemctl start docker
 
 # Add user to docker group
 sudo usermod -aG docker $USER
 # Log out and back in
 ```
 
-#### Volume Mount Fails
-```
-Error: Cannot mount volume: no such file or directory
-```
+### No Environments Found
 
-**Causes:**
-- Directory doesn't exist
-- Wrong path in mount command
-- Relative vs absolute path issues
+**Error:** `No deployment.yml files found in environments/`
 
-**Solution:**
+**Fix:**
 ```bash
-# Use absolute paths
-pwd  # Get current directory
-# Adjust paths in onboarder-run.py
+# Ensure file ends with .deployment.yml
+mv environments/myenv/config.yml environments/myenv/myenv.deployment.yml
 
-# Ensure directories exist
-mkdir -p usr_home/<env>/logs
+# Check it exists
+ls environments/myenv/*.deployment.yml
 ```
 
-### SSH Connection Issues
+### SSH Connection Fails
 
-#### SSH Key Not Found
-```
-Error: file not found: /usr_home/<env>/.ssh/id_rsa
-```
+**Error:** `Failed to connect to the host via ssh: Permission denied`
 
 **Causes:**
-- SSH key not generated
-- Key file in wrong location
-- Wrong path in inventory
-
-**Solution:**
-```bash
-# Generate SSH key
-ssh-keygen -t rsa -b 4096 -f usr_home/<env>/.ssh/id_rsa -N ""
-
-# Verify key exists
-ls -la usr_home/<env>/.ssh/
-
-# Check permissions
-chmod 600 usr_home/<env>/.ssh/id_rsa
-```
-
-#### SSH Permission Denied
-```
-FAILED! => {"msg": "Failed to connect to the host via ssh: Permission denied (publickey,password)."}
-```
-
-**Causes:**
-- Public key not on target host
-- Wrong password
-- SSH key passphrase not provided
-- User doesn't have access
-
-**Solution:**
-```bash
-# Copy public key to target
-ssh-copy-id -i usr_home/<env>/.ssh/id_rsa.pub root@target-host
-
-# Test SSH manually
-ssh -i usr_home/<env>/.ssh/id_rsa root@target-host
-
-# If using password, check ansible_password in config.yml
-```
-
-#### SSH Host Key Verification Failed
-```
-FAILED! => {"msg": "Failed to connect: Host key verification failed"}
-```
-
-**Causes:**
-- Host key not in known_hosts
-- Host key changed (security warning!)
-- StrictHostKeyChecking enabled
-
-**Solution:**
-```bash
-# Option 1: Add to known_hosts
-ssh-keyscan -H target-host >> ~/.ssh/known_hosts
-
-# Option 2: Disable strict checking (not recommended for production)
-# In config.yml:
-ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
-```
-
-#### SSH Connection Timeout
-```
-FAILED! => {"msg": "Failed to connect: Connection timed out"}
-```
-
-**Causes:**
-- Host unreachable
-- Firewall blocking SSH
 - Wrong IP address
-- Network issues
+- Wrong username/password
+- Host not reachable
 
-**Solution:**
+**Fix:**
 ```bash
-# Check connectivity
-ping target-host
+# Test SSH manually from inside container
+ssh -i .ssh/mcm_ssh_key rancher@192.168.1.10
 
-# Check port
-nc -zv target-host 22
-
-# Test SSH
-ssh -vvv -i usr_home/<env>/.ssh/id_rsa root@target-host
-
-# Check firewall
-# On target:
-sudo firewall-cmd --list-all
+# If that fails:
+# 1. Check IP is correct in deployment.yml
+# 2. Check host is pingable: ping 192.168.1.10
+# 3. Check username/password in deployment.yml
+# 4. Try password auth: ssh rancher@192.168.1.10
 ```
 
-### Ansible Execution Issues
+**For baremetal:** Ensure all servers are accessible
+```bash
+# Test all servers
+for ip in 192.168.1.{11..19}; do
+  ssh -o ConnectTimeout=5 rancher@$ip hostname
+done
+```
 
-#### Ansible Playbook Syntax Error
-```
-ERROR! Syntax Error while loading YAML.
-```
+### Task Not Found
+
+**Error:** `task: Task "deploy-mcm" not found`
 
 **Causes:**
-- Invalid YAML in playbook
-- Incorrect indentation
-- Missing quotes around special characters
+- Not in correct directory
+- Taskfile.yml not generated
 
-**Solution:**
+**Fix:**
 ```bash
-# Validate playbook syntax
-ansible-playbook --syntax-check data/tasks/basekit/task.yml
+# Check you're in install directory
+pwd  # Should be /docker-workspace/install
 
-# Check YAML
-python3 -c "import yaml; yaml.safe_load(open('data/tasks/basekit/task.yml'))"
+# Check Taskfile exists
+ls -la Taskfile.yml
+
+# If missing, regenerate
+rm .first_run_complete
+exit
+python3 onboarder-run.py
 ```
 
-#### Module Not Found
-```
-FAILED! => {"msg": "The module community.general.xyz was not found"}
-```
+### VM Creation Fails (Basekit)
+
+**Error:** `Failed to create VM` or `backing store not found`
 
 **Causes:**
-- Ansible collection not installed in container
-- Typo in module name
-- Wrong Ansible version
+- Base image doesn't exist on KVM host
+- Wrong path in deployment.yml
 
-**Solution:**
+**Fix:**
 ```bash
-# Install collection in container
-# Add to data/requirements.yml:
-collections:
-  - name: community.general
-    version: ">=5.0.0"
+# SSH to KVM host and check
+ssh rancher@<kvm-host-ip>
+ls -lh /var/lib/libvirt/images/rocky9.qcow2
 
-# Rebuild container to include collection
+# If missing, download Rocky 9:
+wget https://download.rockylinux.org/pub/rocky/9/images/x86_64/Rocky-9-GenericCloud-Base.latest.x86_64.qcow2
+mv Rocky-9-GenericCloud-Base.latest.x86_64.qcow2 /var/lib/libvirt/images/rocky9.qcow2
+
+# Update deployment.yml with correct path
 ```
 
-#### Become (sudo) Fails
-```
-FAILED! => {"msg": "Missing sudo password"}
-```
+### Insufficient Resources
 
-**Causes:**
-- ansible_become_password not set
-- User doesn't have sudo access
-- sudo requires password but none provided
+**Error:** `Cannot allocate memory` or VM creation fails
 
-**Solution:**
+**Fix:**
 ```yaml
-# In config.yml or group_vars:
-ansible_become: true
-ansible_become_method: sudo
-ansible_become_password: "SudoPassword"
-
-# Or use passwordless sudo on target
-# On target: sudo visudo
-# Add: username ALL=(ALL) NOPASSWD: ALL
+# Reduce VM resources in deployment.yml
+virtual_machines:
+  mcm:
+    memory: 8192    # Reduced from 16384
+    vcpus: 4        # Reduced from 8
 ```
 
-#### Variable Not Defined in Ansible
-```
-FAILED! => {"msg": "The task includes an option with an undefined variable. The error was: 'cluster_domain' is undefined"}
-```
+### Ansible Playbook Fails
 
-**Causes:**
-- Variable not in group_vars/host_vars
-- Variable in wrong scope
-- Typo in variable name
+**Error:** Various Ansible errors
 
-**Solution:**
+**Fix:**
 ```bash
-# Check variable is defined
-ansible-inventory -i usr_home/<env>/config.yml --list | grep cluster_domain
+# Check detailed log
+tail -100 .cache/logs/task_<failed-task>.log
 
-# Add to appropriate group_vars file
-echo "cluster_domain: example.com" >> usr_home/<env>/group_vars/basekit.yml
+# Common issues:
+# - Missing variables: Check deployment.yml
+# - Permission denied: Check sudo access
+# - Host unreachable: Check network/firewall
 ```
 
-### Execution Issues
+### Node Not Ready
 
-#### Step Timeout
-```
-Error: Step 'deploy_vms' exceeded timeout of 600 seconds
-```
+**Error:** Kubernetes node shows NotReady
 
-**Causes:**
-- Operation taking longer than expected
-- Timeout too short for operation
-- Step hung on user input
-- Infrastructure performance issues
-
-**Solution:**
-```yaml
-# Increase timeout in profile
-# data/profiles/basekit/default.yml
-steps:
-  - id: deploy_vms
-    timeout: 1800  # Increase to 30 minutes
-```
-
-#### Step Fails Repeatedly
-```
-Error: Step 'install_k8s' failed with exit code 2
-```
-
-**Causes:**
-- Underlying infrastructure issue
-- Missing prerequisite
-- Non-idempotent operation failing on re-run
-- Resource constraints (disk, memory)
-
-**Solution:**
+**Fix:**
 ```bash
-# Check detailed logs
-cat usr_home/<env>/logs/step_X_install_k8s.log
+# Check node status
+kubectl --kubeconfig=kubeconfig-mcm get nodes
 
-# SSH to target and check
-ssh -i usr_home/<env>/.ssh/id_rsa root@target
-# Check disk: df -h
-# Check memory: free -m
-# Check processes: ps aux
-# Check logs: journalctl -xe
+# Describe node for details
+kubectl --kubeconfig=kubeconfig-mcm describe node <node-name>
 
-# Fix underlying issue, then resume
-python3 onboarder-run.py --env=<env>
+# Common causes:
+# - CNI not ready: Wait a few minutes
+# - Disk pressure: Check disk space on node
+# - Network issues: Check node can reach others
 ```
 
-#### State File Corrupted
-```
-Error: Cannot parse state file: Invalid JSON
-```
+### RKE2 Install Fails
 
-**Causes:**
-- Installer killed mid-write
-- Manual editing of state file
-- Filesystem issues
+**Error:** RKE2 installation fails
 
-**Solution:**
+**Fix:**
 ```bash
-# Backup corrupted state
-cp usr_home/<env>/.installer_state usr_home/<env>/.installer_state.bak
+# SSH to the node
+ssh -i .ssh/mcm_ssh_key rancher@<node-ip>
 
-# Remove state to start fresh
-rm usr_home/<env>/.installer_state
+# Check RKE2 logs
+sudo journalctl -u rke2-server -n 100
 
-# Or manually fix JSON
-vim usr_home/<env>/.installer_state
+# Common issues:
+# - Port 6443 blocked: Check firewall
+# - SELinux blocking: Check audit log
+# - Disk full: df -h
 ```
 
-### Resource Issues
+### Harbor Not Accessible
 
-#### Disk Space Exhausted
-```
-Error: No space left on device
-```
+**Error:** Cannot access Harbor registry
 
-**Causes:**
-- Large logs
-- Container images using space
-- VM disk images filling partition
-
-**Solution:**
+**Fix:**
 ```bash
-# Check disk usage
-df -h
+# Check Harbor pods
+kubectl --kubeconfig=kubeconfig-mcm get pods -n harbor
 
-# Clean up Docker/Podman
-docker system prune -a
+# Check ingress
+kubectl --kubeconfig=kubeconfig-mcm get ingress -n harbor
 
-# Clean old logs
-find usr_home/*/logs -mtime +30 -delete
-
-# Move images to larger partition
+# Get Harbor URL
+kubectl --kubeconfig=kubeconfig-mcm get ingress -n harbor \
+  -o jsonpath='{.items[0].spec.rules[0].host}'
 ```
 
-#### Out of Memory
-```
-Error: Cannot allocate memory
-```
+### Rancher Not Accessible
 
-**Causes:**
-- Too many concurrent operations
-- VMs using too much memory
-- Memory leak
+**Error:** Cannot access Rancher UI
 
-**Solution:**
+**Fix:**
 ```bash
-# Check memory usage
-free -m
+# Check Rancher pods
+kubectl --kubeconfig=kubeconfig-mcm get pods -n cattle-system
 
-# Adjust VM memory allocations
-# In config.yml, reduce vm_memory values
+# Get Rancher URL
+kubectl --kubeconfig=kubeconfig-mcm get ingress -n cattle-system rancher \
+  -o jsonpath='{.spec.rules[0].host}'
 
-# Add swap if needed
-sudo dd if=/dev/zero of=/swapfile bs=1G count=8
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
+# Get bootstrap password
+kubectl --kubeconfig=kubeconfig-mcm get secret -n cattle-system bootstrap-secret \
+  -o jsonpath='{.data.bootstrapPassword}' | base64 -d
 ```
 
-### Debugging Techniques
+### Configuration Looks Wrong
 
-#### Enable Ansible Verbose Mode
-```yaml
-# In data/ansible.cfg (temporarily):
-[defaults]
-verbosity = 2
-```
+**Error:** Generated inventory.yml or Taskfile.yml is incorrect
 
-#### Enable SSH Debug
-```yaml
-# In config.yml:
-ansible_ssh_common_args: '-vvv'
-```
-
-#### Test Ansible Connectivity
+**Fix:**
 ```bash
-# From within container or with ansible-playbook:
-ansible -i usr_home/<env>/config.yml -m ping all
+# Edit deployment.yml
+vim environments/myenv/myenv.deployment.yml
+
+# Regenerate everything
+rm .first_run_complete
+exit
+python3 onboarder-run.py
+
+# Check generated files
+cat inventory.yml
+cat Taskfile.yml
 ```
 
-#### Manual Step Execution
+### Deployment Stuck
+
+**Error:** Task hangs or takes too long
+
+**Fix:**
 ```bash
-# Run Ansible playbook manually
-ansible-playbook -i usr_home/<env>/config.yml data/tasks/basekit/task.yml -vvv
+# Open another terminal, check container
+docker ps
+docker exec -it <container-id> bash
 
-# Run Python script manually
-python3 data/tasks/basekit/script.py
+# Check what's running
+ps aux
 
-# Run shell script manually
-bash data/tasks/common/script.sh
+# Check logs
+tail -f .cache/logs/task_*.log
+
+# If truly stuck, kill and restart
+# Ctrl+C in original terminal
+# Re-run same command - it will resume
 ```
 
-#### Check Ansible Facts
+## Validation Commands
+
+### Before Deployment
+
 ```bash
-ansible -i usr_home/<env>/config.yml -m setup target_host
+# Validate deployment.yml syntax
+python3 -c "import yaml; yaml.safe_load(open('environments/myenv/myenv.deployment.yml'))"
+
+# Check Docker/Podman
+docker --version
+podman --version
+
+# Test SSH to all hosts (update IPs)
+for ip in 192.168.1.10 192.168.1.11; do
+  ssh -o ConnectTimeout=5 user@$ip hostname
+done
 ```
 
-### Getting Help
+### During Deployment
 
-#### Information to Collect
+```bash
+# Inside container
+
+# Check generated inventory
+ansible-inventory -i inventory.yml --list
+
+# Test Ansible connectivity
+ansible -i inventory.yml -m ping all
+
+# Check state
+cat .cache/state.json
+
+# Monitor logs
+tail -f .cache/logs/task_*.log
+```
+
+### After Deployment
+
+```bash
+# Check clusters
+kubectl --kubeconfig=kubeconfig-mcm get nodes
+kubectl --kubeconfig=kubeconfig-osms get nodes
+
+# Check pods
+kubectl --kubeconfig=kubeconfig-mcm get pods -A
+
+# Check services
+kubectl --kubeconfig=kubeconfig-mcm get svc -A
+```
+
+## Reset Procedures
+
+### Reset State Only
+
+```bash
+# Inside container
+rm .cache/state.json
+# Re-run deployment - all tasks run again
+```
+
+### Reset All Generated Config
+
+```bash
+# Inside container
+rm .first_run_complete
+exit
+
+# Restart container
+python3 onboarder-run.py
+# Regenerates everything
+```
+
+### Complete Clean Slate
+
+```bash
+# Remove entire environment
+rm -rf environments/myenv
+
+# Start over
+mkdir -p environments/myenv
+cp docs/examples/basekit.deployment.yml environments/myenv/myenv.deployment.yml
+vim environments/myenv/myenv.deployment.yml
+python3 onboarder-run.py
+```
+
+## Getting Help
+
 When asking for help, provide:
-1. Full error message
-2. Command that failed
-3. Relevant logs (`usr_home/<env>/logs/`)
-4. State file (`usr_home/<env>/.installer_state`)
-5. Configuration (sanitize secrets!)
-6. Profile being used
-7. Environment (OS, Python version, Docker/Podman version)
 
-#### Log Sanitization
-```bash
-# Remove passwords before sharing
-sed 's/ansible_password:.*/ansible_password: REDACTED/' config.yml > config_sanitized.yml
-```
+1. **What you're trying to do:**
+   - Deployment type (basekit/baremetal)
+   - Step that failed
+
+2. **Error message:**
+   ```bash
+   tail -50 .cache/logs/task_<failed-task>.log
+   ```
+
+3. **Your environment:**
+   - OS version: `cat /etc/os-release`
+   - Container runtime: `docker --version` or `podman --version`
+   - Python version: `python3 --version`
+
+4. **State file:**
+   ```bash
+   cat .cache/state.json
+   ```
+
+5. **Deployment config (sanitize passwords!):**
+   ```bash
+   cat environments/myenv/myenv.deployment.yml | grep -v "pass:"
+   ```
 
 ## Quick Reference
 
-### Reset Everything
 ```bash
-# Start completely fresh
-python3 onboarder-run.py --env=<env> --reset-state
-```
+# View logs
+tail -f .cache/logs/task_*.log
 
-### Check Configuration
-```bash
-# Validate without executing
-python3 onboarder-run.py --env=<env> --validate-only
-```
+# Check state
+cat .cache/state.json
+jq '.completed_tasks | keys' .cache/state.json
 
-### View Inventory
-```bash
-# See parsed inventory
-ansible-inventory -i usr_home/<env>/config.yml --list --yaml
-```
+# Reset state
+rm .cache/state.json
 
-### Test Single Host
-```bash
-# Test connectivity to one host
-ansible -i usr_home/<env>/config.yml -m ping target_host
-```
+# Regenerate config
+rm .first_run_complete && exit
 
-### Manual Resume
-```bash
-# Edit state file to resume from specific step
-vim usr_home/<env>/.installer_state
-# Remove steps after the one you want to resume from
+# Test SSH
+ssh -i .ssh/mcm_ssh_key rancher@<host-ip>
+
+# Test Ansible
+ansible -i inventory.yml -m ping all
+
+# Check kubeconfig
+kubectl --kubeconfig=kubeconfig-mcm get nodes
 ```

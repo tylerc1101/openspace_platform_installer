@@ -125,11 +125,15 @@ virtual_machines:
     memory: 16384  # MB
     vcpus: 8
     disk_size: 100  # GB
-    # Network config pulled from management_cluster.clusters[0].nodes[0]
-  
+    backing_store: "/var/lib/libvirt/config/images/9_5_hardened_image_vm.qcow2"
+    os_variant: "rhel9.5"
+    network_bridge: "br-mgmt"
+
   osms:
     name: "osms"
     memory: 32768  # MB
     vcpus: 16
     disk_size: 100  # GB
-    # Network config pulled from openspace_management_system.clusters[0].nodes[0]
+    backing_store: "/var/lib/libvirt/config/images/9_5_hardened_image_vm.qcow2"
+    os_variant: "rhel9.5"
+    network_bridge: "br-mgmt"

@@ -157,6 +157,9 @@ vm_mcm_name: "{{ virtual_machines.mcm.name }}"
 vm_mcm_memory: {{ virtual_machines.mcm.memory }}
 vm_mcm_vcpus: {{ virtual_machines.mcm.vcpus }}
 vm_mcm_disk_size: {{ virtual_machines.mcm.disk_size }}
+vm_mcm_backing_store: "{{ virtual_machines.mcm.backing_store }}"
+vm_mcm_os_variant: "{{ virtual_machines.mcm.os_variant }}"
+vm_mcm_network_bridge: "{{ virtual_machines.mcm.network_bridge }}"
 {% endif %}
 
 {% if virtual_machines.osms is defined %}
@@ -164,5 +167,8 @@ vm_osms_name: "{{ virtual_machines.osms.name }}"
 vm_osms_memory: {{ virtual_machines.osms.memory }}
 vm_osms_vcpus: {{ virtual_machines.osms.vcpus }}
 vm_osms_disk_size: {{ virtual_machines.osms.disk_size }}
+vm_osms_backing_store: "{{ virtual_machines.osms.backing_store }}"
+vm_osms_os_variant: "{{ virtual_machines.osms.os_variant }}"
+vm_osms_network_bridge: "{{ virtual_machines.osms.network_bridge }}"
 {% endif %}
 {% endif %}

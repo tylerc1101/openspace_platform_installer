@@ -98,7 +98,7 @@ tasks:
       - python3 {{.DATA_DIR}}/run_task.py
           --task-id=copy-ssh-key-{{.HOSTS}}
           --hosts={{.HOSTS}}
-          --file={{.DATA_DIR}}/common/copy_ssh_key.yml
+          --file={{.ONBOARDER_DIR}}/tasks/copy_ssh_key.yml
           --kind=ansible
 
   node-prep:

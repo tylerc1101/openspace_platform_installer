@@ -35,9 +35,9 @@
           --memory {{ vm_mcm_memory }}
           --vcpus {{ vm_mcm_vcpus }}
           --cpu host-passthrough
-          --disk size={{ vm_mcm_disk_size }},backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
-          --os-variant rhel9.5
-          --network bridge=br-mgmt,model=virtio
+          --disk size={{ vm_mcm_disk_size }},backing_store="{{ vm_mcm_backing_store }}"
+          --os-variant {{ vm_mcm_os_variant }}
+          --network bridge={{ vm_mcm_network_bridge }},model=virtio
           --import
           --noautoconsole
           --graphics vnc
@@ -110,8 +110,8 @@
           --vcpus {{ vm_osms_vcpus }}
           --cpu host-passthrough
           --disk size={{ vm_osms_disk_size }},backing_store="{{ images_dir}}/9_5_hardened_image_vm.qcow2"
-          --os-variant rhel9.5
-          --network bridge=br-mgmt,model=virtio
+          --os-variant {{ vm_osms_os_variant }}
+          --network bridge={{ vm_osms_network_bridge }},model=virtio
           --import
           --noautoconsole
           --graphics vnc

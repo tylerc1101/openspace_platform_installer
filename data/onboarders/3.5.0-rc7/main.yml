@@ -38,7 +38,7 @@ tasks:
       - task: run-onboarder
 
   deploy-osms:
-    desc: Deploy OSMS Cluster(s) - optionally specify CLUSTER=name
+    desc: Deploy OSMS Cluster
     requires:
       vars: [HOSTS]
     cmds:
@@ -55,12 +55,11 @@ tasks:
       - task: deploy-downstream-cluster
         vars:
           CLUSTER_TYPE: osms
-          CLUSTER_NAME: '{{.CLUSTER | default ""}}'
           DATA_DIR: '{{.DATA_DIR}}'
           ONBOARDER_DIR: '{{.ONBOARDER_DIR}}'
 
   deploy-osdc:
-    desc: Deploy OSDC Cluster(s) - optionally specify CLUSTER=name
+    desc: Deploy OSDC Cluster
     requires:
       vars: [HOSTS]
     cmds:
@@ -77,9 +76,19 @@ tasks:
       - task: deploy-downstream-cluster
         vars:
           CLUSTER_TYPE: osdc
-          CLUSTER_NAME: '{{.CLUSTER | default ""}}'
           DATA_DIR: '{{.DATA_DIR}}'
           ONBOARDER_DIR: '{{.ONBOARDER_DIR}}'
+
+  deploy-post-osdc:
+    desc: "Post-OSDC deployment tasks"
+    requires:
+      vars: [HOSTS]
+    cmds:
+      - python3 {{.DATA_DIR}}/run_task.py
+          --task-id=deploy-post-osdc-{{.HOSTS}}
+          --hosts=localhost
+          --file={{.ONBOARDER_DIR}}/tasks/post-osdc.yml
+          --kind=ansible
 
   deploy-downstream-cluster:
     desc: Deploy Downstream Cluster (OSMS or OSDC)
@@ -87,10 +96,10 @@ tasks:
       vars: [CLUSTER_TYPE]
     cmds:
       - python3 {{.DATA_DIR}}/run_task.py 
-          --task-id=deploy-{{.CLUSTER_TYPE}}-cluster{{if .CLUSTER_NAME}}-{{.CLUSTER_NAME}}{{end}}
+          --task-id=deploy-{{.CLUSTER_TYPE}}-cluster
           --kind=ansible
           --file={{.ONBOARDER_DIR}}/tasks/deploy_downstream_cluster.yml
-          --extra-vars="cluster_type={{.CLUSTER_TYPE}}{{if .CLUSTER_NAME}} cluster_name={{.CLUSTER_NAME}}{{end}}"
+          --args="-e cluster_type={{.CLUSTER_TYPE}}"
 
 #=================================================================================#
 # Node Prep                                                                       #

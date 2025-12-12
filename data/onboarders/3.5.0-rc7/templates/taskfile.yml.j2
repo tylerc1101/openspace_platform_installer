@@ -41,7 +41,7 @@ tasks:
       - task: main:deploy-mcm
         vars:
           HOSTS: management_cluster
-      - task: main:get-kubeconfig-mcm
+      #- task: main:get-kubeconfig-mcm
 
   deploy-osms:
     desc: "Deploy OSMS (OpenSpace Management System)"
@@ -59,6 +59,18 @@ tasks:
           HOSTS: openspace_datapath_cluster
       #- task: deployment:get-kubeconfig-osdc
 
+  deploy-post-osdc:
+    desc: "Post-OSDC deployment tasks"
+    cmds:
+      - task: main:deploy-post-osdc
+        vars:
+          HOSTS: openspace_datapath_cluster
+
+  deploy-opscenter:
+    desc: "Deploy OpenSpace Tooling"
+    cmds:
+      - task: main:deploy-opscenter
+
   deploy-all:
     desc: "Deploy all clusters (MCM → OSMS → OSDC)"
     cmds:
@@ -66,6 +78,38 @@ tasks:
       - task: deploy-mcm
       - task: deploy-osms
       - task: deploy-osdc
+
+  # ============================================================================
+  # Destroy Tasks
+  # ============================================================================
+  destroy-mcm:
+    desc: "Destroy MCM (Management Cluster Manager)"
+    cmds:
+      - task: main:destroy-mcm
+        vars:
+          HOSTS: management_cluster
+      #- task: main:get-kubeconfig-mcm
+
+  destroy-osms:
+    desc: "Destroy OSMS (OpenSpace Management System)"
+    cmds:
+      - task: main:destroy-osms
+        vars:
+          HOSTS: openspace_management_system
+      #- task: deployment:get-kubeconfig-osms
+
+  destroy-osdc:
+    desc: "Destroy OSDC (OpenSpace Data Cluster)"
+    cmds:
+      - task: main:destroy-osdc
+        vars:
+          HOSTS: openspace_datapath_cluster
+      #- task: deployment:get-kubeconfig-osdc
+
+  destroy-opscenter:
+    desc: "Runs clean all task in the OpenSpace Tooling"
+    cmds:
+      - task: main:destroy-opscenter
 
   # ============================================================================
   # Kubeconfig Tasks
